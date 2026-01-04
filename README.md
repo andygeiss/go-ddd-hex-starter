@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="cmd/server/assets/static/img/icon-192.png" alt="Go DDD Hexagonal Starter logo" width="96" height="96">
+</p>
+
 # Go DDD Hexagonal Starter
 
 [![Go Reference](https://pkg.go.dev/badge/go-ddd-hex-starter.svg)](https://pkg.go.dev/go-ddd-hex-starter)
