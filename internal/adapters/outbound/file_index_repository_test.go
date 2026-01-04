@@ -3,10 +3,11 @@ package outbound_test
 import (
 	"context"
 	"fmt"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
 	"os"
 	"testing"
+
+	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
+	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
 )
 
 // Every benchmark should follow the Benchmark_<struct>_<method>_With_<condition>_Should_<result> pattern.

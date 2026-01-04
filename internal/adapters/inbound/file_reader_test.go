@@ -3,9 +3,10 @@ package inbound_test
 import (
 	"context"
 	"fmt"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
 	"os"
 	"testing"
+
+	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
 
 	"github.com/andygeiss/cloud-native-utils/assert"
 )

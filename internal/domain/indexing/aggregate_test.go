@@ -1,8 +1,9 @@
 package indexing_test
 
 import (
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
 	"testing"
+
+	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
 
 	"github.com/andygeiss/cloud-native-utils/assert"
 )

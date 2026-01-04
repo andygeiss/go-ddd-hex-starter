@@ -2,6 +2,7 @@ package indexing
 
 import (
 	"context"
+
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/event"
 
 	"github.com/andygeiss/cloud-native-utils/resource"

@@ -4,9 +4,10 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
 	"net/http"
 	"os"
+
+	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
 
 	"github.com/andygeiss/cloud-native-utils/logging"
 	"github.com/andygeiss/cloud-native-utils/security"

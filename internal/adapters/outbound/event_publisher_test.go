@@ -2,9 +2,10 @@ package outbound_test
 
 import (
 	"context"
+	"testing"
+
 	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
-	"testing"
 
 	"github.com/andygeiss/cloud-native-utils/assert"
 	"github.com/andygeiss/cloud-native-utils/messaging"

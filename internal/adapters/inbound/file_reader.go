@@ -2,10 +2,11 @@ package inbound
 
 import (
 	"context"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
 )
 
 // The Inbound package creates (e.g. via context.Background()) or receives the context, e.g. via http.Request.Context().

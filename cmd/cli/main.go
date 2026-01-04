@@ -4,10 +4,11 @@ import (
 	"context"
 	"embed"
 	"fmt"
+	"os"
+
 	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
 	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
-	"os"
 )
 
 // We use embed.FS to embed files into the binary.
