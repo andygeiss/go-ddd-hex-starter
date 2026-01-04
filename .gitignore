@@ -15,5 +15,5 @@
 bin
 
 # Profiler artifacts
-coverprofile.*
+coverage.*
 cpuprofile.*
