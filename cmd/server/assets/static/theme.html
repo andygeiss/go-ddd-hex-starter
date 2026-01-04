@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <title>Theme Demo</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <!-- Layer 1: Reset / foundation -->
+        <link rel="stylesheet" href="/static/css/base.css" />
+        <!-- Layer 2: Design tokens -->
+        <link rel="stylesheet" href="/static/css/theme.css" />
+        <!-- Layer 3: Components / layout -->
+        <link rel="stylesheet" href="/static/css/styles.css" />
+    </head>
+    <body>
+        <!-- Demonstrates body styles (layout + typography) -->
+        <header class="nav">
+            <div class="nav__brand">Theme Demo</div>
+
+            <!-- Mobile nav toggle: .nav__toggle, .nav__toggle-label, .nav__hamburger -->
+            <input type="checkbox" id="nav-toggle" class="nav__toggle" />
+            <label
+                for="nav-toggle"
+                class="nav__toggle-label"
+                aria-label="Toggle navigation"
+            >
+                <span class="nav__hamburger"></span>
+            </label>
+
+            <!-- Desktop + mobile navigation links: .nav__links, .nav__link -->
+            <nav class="nav__links">
+                <a href="#hero" class="nav__link">Home</a>
+                <a href="#cards" class="nav__link">Cards</a>
+                <a href="#forms" class="nav__link">Forms</a>
+                <a href="#utilities" class="nav__link">Utilities</a>
+            </nav>
+        </header>
+
+        <div class="container">
+            <main>
+                <!-- HERO SECTION: h1, p, buttons, utilities -->
+                <section id="hero" class="flex-column gap-4 py-4">
+                    <h1 class="text-center">Theme Demo</h1>
+                    <p class="text-center">
+                        Colors, spacing, and typography are powered by CSS
+                        custom properties defined in the theme layer.
+                    </p>
+
+                    <div class="flex-center gap-4">
+                        <!-- Buttons: .btn + size / variant modifiers -->
+                        <button class="btn btn-primary btn-lg">
+                            Primary Action
+                        </button>
+                        <button class="btn btn-outline btn-lg">
+                            Outline Action
+                        </button>
+                        <button class="btn btn-ghost btn-lg">
+                            Ghost Action
+                        </button>
+                    </div>
+
+                    <div class="flex-center gap-2 mt-4">
+                        <button class="btn btn-secondary btn-sm">
+                            Secondary Small
+                        </button>
+                        <button class="btn btn-primary btn-sm">
+                            Primary Small
+                        </button>
+                    </div>
+                </section>
+
+                <!-- CARDS SECTION: .card, .card__header, .card__body, .card__footer -->
+                <section id="cards" class="my-4">
+                    <h2 class="mb-4">Card Components</h2>
+
+                    <div class="flex-column gap-4">
+                        <article class="card">
+                            <header class="card__header">
+                                <h3>Standard Card</h3>
+                                <p class="text-success">
+                                    Uses surface background, radius, and shadow
+                                    tokens.
+                                </p>
+                            </header>
+                            <div class="card__body">
+                                <p>
+                                    This card body demonstrates how layout
+                                    tokens (spacing, shadows, radii) combine
+                                    with typography tokens from the theme.
+                                </p>
+                            </div>
+                            <footer class="card__footer">
+                                <button class="btn btn-outline btn-sm">
+                                    Cancel
+                                </button>
+                                <button class="btn btn-primary btn-sm">
+                                    Confirm
+                                </button>
+                            </footer>
+                        </article>
+
+                        <article class="card">
+                            <header class="card__header">
+                                <h3>Card With Error State</h3>
+                                <p class="text-error">
+                                    Something went wrong while loading the
+                                    content.
+                                </p>
+                            </header>
+                            <div class="card__body">
+                                <p>
+                                    The
+                                    <span class="text-error">text-error</span>
+                                    and
+                                    <span class="text-success"
+                                        >text-success</span
+                                    >
+                                    utilities use error/success colors.
+                                </p>
+                            </div>
+                            <footer class="card__footer">
+                                <button class="btn btn-secondary btn-sm">
+                                    Retry
+                                </button>
+                            </footer>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- FORMS SECTION: .form-group, .form-label, .form-input, .text-error, .sr-only -->
+                <section id="forms" class="my-4">
+                    <h2 class="mb-4">Form Elements</h2>
+
+                    <form class="flex-column gap-4">
+                        <div class="form-group">
+                            <label for="email" class="form-label"
+                                >Email address</label
+                            >
+                            <input
+                                id="email"
+                                type="email"
+                                class="form-input"
+                                placeholder="you@example.com"
+                                aria-describedby="email-help email-error"
+                            />
+                            <span id="email-help" class="sr-only"
+                                >We will never share your email.</span
+                            >
+                            <p id="email-error" class="text-error mt-4">
+                                Please enter a valid email.
+                            </p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password" class="form-label"
+                                >Password</label
+                            >
+                            <input
+                                id="password"
+                                type="password"
+                                class="form-input"
+                                placeholder="••••••••"
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="message" class="form-label"
+                                >Message</label
+                            >
+                            <textarea
+                                id="message"
+                                rows="4"
+                                class="form-input"
+                                placeholder="Tell us more..."
+                            ></textarea>
+                        </div>
+
+                        <div class="flex-center gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                Submit
+                            </button>
+                            <button type="reset" class="btn btn-ghost">
+                                Reset
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- UTILITIES SECTION: flex, gaps, text-center, padding/margin utilities -->
+                <section id="utilities" class="my-4">
+                    <h2 class="mb-4">Utility Classes</h2>
+
+                    <div class="card p-4">
+                        <div class="flex-center flex-column gap-2">
+                            <p class="text-center">
+                                This block uses <code>.flex-center</code>,
+                                <code>.flex-column</code>, <code>.gap-2</code>,
+                                <code>.p-4</code>, and
+                                <code>.text-center</code>.
+                            </p>
+                            <div class="flex-center gap-1">
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-1</span
+                                >
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-2</span
+                                >
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-4</span
+                                >
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-6</span
+                                >
+                            </div>
+                            <p class="mt-4 mb-4">
+                                Margin utilities like <code>.mt-4</code>,
+                                <code>.mb-4</code>, and <code>.my-4</code> apply
+                                vertical spacing quickly.
+                            </p>
+                            <div class="px-4 py-4 btn btn-secondary btn-sm">
+                                px-4 and py-4 around this button container
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Mobile thumb zone: .action-bar, .action-bar__item -->
+        <nav class="action-bar" aria-label="Quick actions">
+            <a href="#hero" class="action-bar__item">Home</a>
+            <a href="#cards" class="action-bar__item">Cards</a>
+            <a href="#forms" class="action-bar__item">Forms</a>
+            <a href="#utilities" class="action-bar__item">Utilities</a>
+        </nav>
+
+        <!-- Base.css is exercised implicitly via a, button, input, textarea, img/picture/svg/video, ol/ul, table -->
+        <section class="container my-4">
+            <h2 class="mb-4">Base Layer Examples</h2>
+
+            <ul>
+                <li><a href="#hero">Anchor reset (no default underline)</a></li>
+                <li>
+                    <button class="btn btn-outline btn-sm">
+                        Button reset (no native styles)
+                    </button>
+                </li>
+            </ul>
+
+            <table class="mt-4">
+                <tr>
+                    <th>Element</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>img</td>
+                    <td>Uses base.css defaults for display and max-width</td>
+                </tr>
+            </table>
+        </section>
+
+        <footer class="container my-4 text-center">
+            <p>&copy; Theme Demo</p>
+        </footer>
+    </body>
+</html>

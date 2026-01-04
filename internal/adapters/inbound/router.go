@@ -29,10 +29,6 @@ func Route(ctx context.Context, efs embed.FS, logger *slog.Logger) *http.ServeMu
 
 	// The static assets are served from the embed.FS under the /static path directly.
 	// This is defined in the security.NewServeMux function from cloud-native-utils.
-	// There is a /static/keepalive.txt with a keepalive message (OK).
-	// We can use this to check if the server is alive.
-	//
-	// curl http://localhost:8080/static/keepalive.txt
 
 	// Add the index endpoint for the UI.
 	// The HttpViewIndex is handling unauthenticated and authenticated requests.
