@@ -1,4 +1,4 @@
-# AGENT
+# README-maintainer.md
 
 This document specifies how a README maintainer agent should understand and work with the `go-ddd-hex-starter` repository. It complements `CONTEXT.md` (architectural constraints) and `README.md` (human-facing documentation).
 
