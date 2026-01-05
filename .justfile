@@ -50,14 +50,14 @@ down:
 # ======================================
 # Fmt - Format Go code
 # ======================================
-# Formats Go source files using gofmt with simplification
+# Formats Go source files using golangci-lint formatters
 # Modifies files in place
 #
 # Requirements:
-# - `go` must be on PATH (gofmt is included with Go)
+# - `golangci-lint` must be installed (brew install golangci-lint)
 
 fmt:
-    @gofmt -s -w .
+    @golangci-lint fmt ./...
 
 # ======================================
 # Lint - Run golangci-lint
