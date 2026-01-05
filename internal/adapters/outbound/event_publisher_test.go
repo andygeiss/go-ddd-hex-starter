@@ -20,7 +20,9 @@ func Test_EventPublisher_With_An_Internal_Dispatcher_Should_Publish_Successfully
 		},
 	}
 	publisher := outbound.NewEventPublisher(dispatcher)
-	event := indexing.NewEventFileIndexCreated(indexing.IndexID("test-id"), 1)
+	event := indexing.NewEventFileIndexCreated().
+		WithIndexID("test-id").
+		WithFileCount(1)
 
 	// Act
 	err := publisher.Publish(context.Background(), event)

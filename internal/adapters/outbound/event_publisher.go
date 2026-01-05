@@ -10,6 +10,7 @@ import (
 )
 
 // This file contains the implementation of the EventPublisher.
+// It is defined in the domain/indexing package as an outbound port.
 // It uses a messaging dispatcher from the cloud-native-utils package.
 
 // EventPublisher represents an event publisher.

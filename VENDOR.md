@@ -1,579 +1,349 @@
-# VENDOR.md
+# Vendor Documentation
 
-> **Vendor documentation** for AI agents, retrieval systems, and developers.  
-> Consult this file when working with external libraries, especially for cross-cutting concerns.
-
----
-
-## 1. Vendor Philosophy
-
-This template **prefers reuse over reinvention**. Before writing new utility code for cross-cutting concerns, check if an approved vendor library already provides the functionality.
-
-**Rule**: Use `cloud-native-utils` first. Only implement custom primitives when the library clearly does not cover the use case or when there is a justified, documented reason.
+This document describes approved third-party libraries and their recommended usage patterns within this template. Agents and developers should consult this document before implementing custom utilities that might duplicate existing vendor functionality.
 
 ---
 
-## 2. Primary Vendor: `cloud-native-utils`
+## Table of Contents
 
-| Property       | Value                                                                 |
-|----------------|-----------------------------------------------------------------------|
-| **Repository** | [github.com/andygeiss/cloud-native-utils](https://github.com/andygeiss/cloud-native-utils) |
-| **Go Docs**    | [pkg.go.dev/github.com/andygeiss/cloud-native-utils](https://pkg.go.dev/github.com/andygeiss/cloud-native-utils) |
-| **Version**    | v0.4.8 (see `go.mod`)                                                 |
-| **License**    | MIT                                                                   |
+- [cloud-native-utils](#cloud-native-utils)
+  - [Purpose](#purpose)
+  - [Package Reference](#package-reference)
+  - [Usage in This Template](#usage-in-this-template)
+  - [Recommended Patterns](#recommended-patterns)
+  - [When NOT to Use](#when-not-to-use)
+- [htmx](#htmx)
+  - [Purpose](#purpose-1)
+  - [Core Attributes](#core-attributes)
+  - [Usage in This Template](#usage-in-this-template-1)
+  - [Recommended Patterns](#recommended-patterns-1)
+  - [When NOT to Use](#when-not-to-use-1)
 
-### 2.1 Purpose
+---
 
-A collection of modular, high-performance utilities for building cloud-native Go applications. Each package is independent—no monolithic framework. The library covers:
+## cloud-native-utils
+
+| Property | Value |
+|----------|-------|
+| Repository | [github.com/andygeiss/cloud-native-utils](https://github.com/andygeiss/cloud-native-utils) |
+| Documentation | [pkg.go.dev/github.com/andygeiss/cloud-native-utils](https://pkg.go.dev/github.com/andygeiss/cloud-native-utils) |
+| Version | v0.4.8 (as of 2026-01-05) |
+| License | MIT |
+
+### Purpose
+
+A collection of modular, high-performance utilities for building cloud-native Go applications. Each package is designed to be used independently—no monolithic framework. Use this library first before implementing custom solutions for:
 
 - Testing assertions
-- Transactional consistency
-- Concurrency and channel helpers
-- Generic resource access (CRUD)
-- Security (encryption, hashing, OIDC)
-- Service lifecycle and orchestration
-- Stability patterns (circuit breaker, retry, throttle)
-- Templating and i18n
-- Messaging (pub/sub)
-- Scheduling primitives
+- Data persistence and CRUD operations
+- Concurrent processing
+- Security (encryption, auth, HTTP server)
+- Messaging / pub-sub
+- Stability patterns (retries, circuit breakers)
+- HTML templating
 
 ---
 
-## 3. Package Reference
+### Package Reference
 
-### 3.1 `assert` — Test Assertions
+| Package | Purpose | Key Types/Functions |
+|---------|---------|---------------------|
+| `assert` | Minimal test assertions | `assert.That(t, desc, got, want)` |
+| `consistency` | Transactional event log with JSON file persistence | `JsonFileLogger[K, V]` |
+| `efficiency` | Channel helpers for concurrent processing | `Generate`, `Merge`, `Split`, `Process` |
+| `extensibility` | Dynamic plugin loading | `LoadPlugin[T]` |
+| `i18n` | Internationalization with embedded YAML | `Translations`, `FormatDateISO`, `FormatMoney` |
+| `imaging` | QR code generation | `GenerateQRCodeDataURL` |
+| `logging` | Structured JSON logging + HTTP middleware | `NewJsonLogger`, `WithLogging` |
+| `messaging` | Publish-subscribe dispatcher (in-memory or Kafka) | `Dispatcher`, `NewInternalDispatcher`, `NewExternalDispatcher` |
+| `redirecting` | HTMX-compatible PRG redirects | `WithPRG`, `Redirect`, `RedirectWithMessage` |
+| `resource` | Generic CRUD access (memory, JSON, YAML, SQLite) | `Access[K, V]`, `JsonFileAccess`, `InMemoryAccess`, `SqliteAccess`, `IndexedAccess` |
+| `scheduling` | Time/slot primitives for booking systems | `TimeOfDay`, `DayHours`, `MustTimeOfDay` |
+| `security` | Encryption, hashing, OIDC, secure HTTP server | `Encrypt`, `Decrypt`, `Password`, `NewServer`, `NewServeMux`, `WithAuth`, `IdentityProvider` |
+| `service` | Context-aware function wrapper, signal handling | `Context`, `Wrap`, `RegisterOnContextDone` |
+| `slices` | Generic slice helpers | `Map`, `Filter`, `Unique`, `Contains` |
+| `stability` | Resilience wrappers for `service.Function` | `Breaker`, `Retry`, `Throttle`, `Debounce`, `Timeout` |
+| `templating` | HTML templating on embedded filesystems | `Engine`, `Parse`, `Render`, `View` |
 
-**Import**: `github.com/andygeiss/cloud-native-utils/assert`
+---
 
-| Function                  | Description                                      |
-|---------------------------|--------------------------------------------------|
-| `That(t, msg, got, want)` | Assert equality with a clear error message       |
+### Usage in This Template
 
-**When to use**:  
-- All unit tests in this template use `assert.That` for readable, consistent assertions.
+The following table shows where each package is used and the recommended integration layer:
 
-**When NOT to use**:  
-- Complex test scenarios requiring table-driven tests with custom matchers.
+| Package | Template Layer | Example Usage |
+|---------|----------------|---------------|
+| `assert` | Tests (`*_test.go`) | Test assertions in [file_reader_test.go](internal/adapters/inbound/file_reader_test.go) |
+| `logging` | Inbound adapters | Request logging via `logging.WithLogging` in [router.go](internal/adapters/inbound/router.go) |
+| `messaging` | Adapters (inbound & outbound) | Event pub/sub in [event_publisher.go](internal/adapters/outbound/event_publisher.go), [event_subscriber.go](internal/adapters/inbound/event_subscriber.go) |
+| `redirecting` | Inbound adapters | PRG pattern in [http_index.go](internal/adapters/inbound/http_index.go) |
+| `resource` | Outbound adapters | Repository implementation via `JsonFileAccess` in [file_index_repository.go](internal/adapters/outbound/file_index_repository.go) |
+| `security` | Inbound adapters | Secure mux, auth middleware in [router.go](internal/adapters/inbound/router.go) |
+| `service` | Adapters & cmd | Function wrapping for messaging handlers in [event_subscriber.go](internal/adapters/inbound/event_subscriber.go) |
+| `templating` | Inbound adapters | HTML rendering in [http_view.go](internal/adapters/inbound/http_view.go), [http_login.go](internal/adapters/inbound/http_login.go), [router.go](internal/adapters/inbound/router.go) |
 
-**Pattern** (from this template):
+---
+
+### Recommended Patterns
+
+#### Testing with `assert`
+
+Use `assert.That` for all test assertions. Follow the Arrange-Act-Assert pattern.
+
 ```go
 import "github.com/andygeiss/cloud-native-utils/assert"
 
-func Test_Index_Hash_With_No_FileInfos_Should_Return_Valid_Hash(t *testing.T) {
-    index := indexing.Index{ID: "empty-index", FileInfos: []indexing.FileInfo{}}
-    hash := index.Hash()
-    assert.That(t, "empty index must have a valid hash (size of 64 bytes)", len(hash), 64)
+func Test_Example_Should_Pass(t *testing.T) {
+    // Arrange
+    expected := 42
+
+    // Act
+    result := ComputeValue()
+
+    // Assert
+    assert.That(t, "result should be 42", result, expected)
 }
 ```
 
----
+#### Repository with `resource`
 
-### 3.2 `resource` — Generic CRUD Access
+Use `resource.JsonFileAccess` (or other backends) instead of custom repository implementations when a key-value shape fits.
 
-**Import**: `github.com/andygeiss/cloud-native-utils/resource`
-
-| Type / Function               | Description                                       |
-|-------------------------------|---------------------------------------------------|
-| `Access[K, V]`                | Generic interface for CRUD on key-value pairs     |
-| `NewInMemoryAccess[K, V]()`   | In-memory backend (useful for tests)              |
-| `NewJsonFileAccess[K, V](f)`  | JSON file–backed storage                          |
-| `NewYamlFileAccess[K, V](f)`  | YAML file–backed storage                          |
-| `NewSqliteAccess[K, V](db)`   | SQLite-backed storage                             |
-| `NewIndexedAccess[K, V](...)` | Add secondary indexing to any `Access`            |
-| `NewMockAccess[K, V]()`       | Mock for unit tests                               |
-
-**When to use**:  
-- Implement `IndexRepository` or any repository port where a key-value shape fits.
-- Prefer this over ad-hoc repository interfaces.
-
-**When NOT to use**:  
-- Complex relational queries requiring joins.
-- High-throughput scenarios needing connection pooling (use dedicated DB drivers).
-
-**Pattern** (from this template):
 ```go
-// Domain defines the port as a type alias
-type IndexRepository resource.Access[IndexID, Index]
+import "github.com/andygeiss/cloud-native-utils/resource"
 
-// Outbound adapter uses the JSON file implementation
-func NewFileIndexRepository(filename string) indexing.IndexRepository {
-    return resource.NewJsonFileAccess[indexing.IndexID, indexing.Index](filename)
+// Embed the generic access type
+type MyRepository struct {
+    resource.JsonFileAccess[MyID, MyEntity]
+}
+
+func NewMyRepository(filename string) MyPort {
+    return resource.NewJsonFileAccess[MyID, MyEntity](filename)
 }
 ```
 
-**Where it lives**: Outbound adapters in `internal/adapters/outbound/`.
+#### Secure HTTP Server with `security`
 
----
+Use `security.NewServeMux` for the base mux with built-in liveness/readiness probes and session support. Use `security.WithAuth` for authentication middleware.
 
-### 3.3 `messaging` — Publish/Subscribe
-
-**Import**: `github.com/andygeiss/cloud-native-utils/messaging`
-
-| Type / Function                 | Description                                       |
-|---------------------------------|---------------------------------------------------|
-| `Dispatcher`                    | Interface for pub/sub messaging                   |
-| `NewInternalDispatcher()`       | In-memory dispatcher for local events             |
-| `NewExternalDispatcher()`       | Kafka-backed dispatcher (requires `KAFKA_BROKERS`)|
-| `NewMessage(topic, payload)`    | Create a new message                              |
-| `Message`                       | Message struct with topic and payload             |
-| `MessageState`                  | Enum for message handling results                 |
-
-**When to use**:  
-- Publish domain events from services.
-- Decouple bounded contexts via event-driven patterns.
-
-**When NOT to use**:  
-- Synchronous request-response patterns (use direct calls).
-- When guaranteed exactly-once delivery is critical (Kafka provides at-least-once).
-
-**Pattern** (from this template):
-```go
-type EventPublisher struct {
-    dispatcher messaging.Dispatcher
-}
-
-func (ep *EventPublisher) Publish(ctx context.Context, e event.Event) error {
-    encoded, _ := json.Marshal(e)
-    msg := messaging.NewMessage(e.Topic(), encoded)
-    return ep.dispatcher.Publish(ctx, msg)
-}
-```
-
-**Where it lives**: Outbound adapters in `internal/adapters/outbound/`.
-
----
-
-### 3.4 `stability` — Resilience Patterns
-
-**Import**: `github.com/andygeiss/cloud-native-utils/stability`
-
-| Function                          | Description                                      |
-|-----------------------------------|--------------------------------------------------|
-| `Breaker(fn, threshold)`          | Circuit breaker—opens after N failures           |
-| `Retry(fn, attempts, delay)`      | Retry with configurable attempts and delay       |
-| `Throttle(fn, maxConcurrent)`     | Limit concurrent executions                      |
-| `Debounce(fn, duration)`          | Delay execution until quiet period               |
-| `Timeout(fn, duration)`           | Enforce maximum execution time                   |
-
-**When to use**:  
-- Wrap calls to external services (HTTP APIs, databases, third-party systems).
-- Prefer these wrappers over custom retry/circuit-breaker logic.
-
-**When NOT to use**:  
-- Internal domain logic (stability patterns are for infrastructure boundaries).
-- Simple in-memory operations that cannot fail transiently.
-
-**Pattern**:
-```go
-import "github.com/andygeiss/cloud-native-utils/stability"
-
-// Wrap an external call with retry and circuit breaker
-fn := stability.Retry(stability.Breaker(externalCall, 3), 5, time.Second)
-result, err := fn(ctx, input)
-```
-
-**Where it lives**: Outbound adapters wrapping external calls.
-
----
-
-### 3.5 `service` — Context & Lifecycle
-
-**Import**: `github.com/andygeiss/cloud-native-utils/service`
-
-| Function / Type                        | Description                                  |
-|----------------------------------------|----------------------------------------------|
-| `Context()`                            | Signal-aware context (SIGINT/SIGTERM)        |
-| `Wrap(fn)`                             | Wrap a function for context-aware execution  |
-| `RegisterOnContextDone(ctx, cleanup)`  | Register cleanup on context cancellation     |
-| `Function[In, Out]`                    | Generic function type used by stability pkg  |
-
-**When to use**:  
-- Create root context in CLI/HTTP entry points.
-- Register graceful shutdown handlers.
-
-**When NOT to use**:  
-- Domain layer code (contexts should be passed in, not created).
-
-**Pattern**:
-```go
-import "github.com/andygeiss/cloud-native-utils/service"
-
-func main() {
-    ctx, cancel := service.Context()
-    defer cancel()
-
-    service.RegisterOnContextDone(ctx, func() {
-        // cleanup resources
-    })
-}
-```
-
-**Where it lives**: Application layer in `cmd/*/main.go`.
-
----
-
-### 3.6 `security` — Encryption, Hashing, HTTP Server
-
-**Import**: `github.com/andygeiss/cloud-native-utils/security`
-
-| Function / Type                  | Description                                         |
-|----------------------------------|-----------------------------------------------------|
-| `GenerateKey()`                  | Generate AES-256 key                                |
-| `Encrypt(plaintext, key)`        | AES-GCM encryption                                  |
-| `Decrypt(ciphertext, key)`       | AES-GCM decryption                                  |
-| `Password(pw)`                   | Hash password with bcrypt                           |
-| `IsPasswordValid(hash, pw)`      | Verify bcrypt password                              |
-| `GenerateID()`                   | Generate secure random ID                           |
-| `GeneratePKCE()`                 | Generate PKCE verifier/challenge for OAuth2         |
-| `NewServer(handler)`             | Preconfigured secure HTTP server                    |
-| `IdentityProvider`               | OIDC helpers (Login, Callback, Logout)              |
-
-**When to use**:  
-- Encrypt sensitive data at rest.
-- Hash user passwords.
-- Set up production HTTP servers with proper timeouts.
-
-**When NOT to use**:  
-- Token-based auth where JWTs are managed externally.
-- When you need custom server configuration beyond env vars.
-
-**Pattern**:
 ```go
 import "github.com/andygeiss/cloud-native-utils/security"
 
-mux := http.NewServeMux()
-// ... register handlers
-server := security.NewServer(mux)  // reads PORT, SERVER_*_TIMEOUT env vars
+mux, sessions := security.NewServeMux(ctx, efs)
+mux.HandleFunc("GET /protected", security.WithAuth(sessions, handler))
+server := security.NewServer(mux)
 ```
 
-**Where it lives**: Adapters (security utilities), application layer (HTTP server setup).
+#### Event Messaging with `messaging`
 
----
+Use `messaging.Dispatcher` for pub/sub patterns. Prefer `NewInternalDispatcher` for in-process communication; use `NewExternalDispatcher` with Kafka for distributed systems.
 
-### 3.7 `logging` — Structured JSON Logging
+```go
+import "github.com/andygeiss/cloud-native-utils/messaging"
 
-**Import**: `github.com/andygeiss/cloud-native-utils/logging`
+dispatcher := messaging.NewInternalDispatcher()
+_ = dispatcher.Subscribe(ctx, "topic", handlerFunc)
+_ = dispatcher.Publish(ctx, messaging.NewMessage("topic", payload))
+```
 
-| Function / Type                  | Description                                         |
-|----------------------------------|-----------------------------------------------------|
-| `NewJsonLogger()`                | Create structured JSON logger (uses `LOGGING_LEVEL`)|
-| `WithLogging(logger, handler)`   | HTTP middleware for request logging                 |
+#### Stability Wrappers
 
-**When to use**:  
-- All production logging in adapters and application layer.
-- HTTP request tracing.
+Wrap external service calls with stability patterns instead of implementing custom retry/circuit-breaker logic.
 
-**When NOT to use**:  
-- Domain layer (domain code should not log directly).
+```go
+import "github.com/andygeiss/cloud-native-utils/stability"
 
-**Pattern**:
+// Circuit breaker: opens after 3 failures
+fn := stability.Breaker(externalCall, 3)
+
+// Retry: up to 5 attempts with 1s delay
+fn := stability.Retry(externalCall, 5, time.Second)
+
+// Combine patterns as needed
+fn := stability.Timeout(stability.Retry(externalCall, 3, time.Second), 10*time.Second)
+```
+
+#### Templating with `templating`
+
+Use the templating engine with embedded filesystems. Parse templates once at startup, reuse the engine for all views.
+
+```go
+import "github.com/andygeiss/cloud-native-utils/templating"
+
+//go:embed assets/templates/*.tmpl
+var templatesFS embed.FS
+
+engine := templating.NewEngine(templatesFS)
+engine.Parse("assets/templates/*.tmpl")
+
+// Use as HTTP handler
+mux.HandleFunc("GET /page", engine.View("page.tmpl", data))
+```
+
+#### Logging with `logging`
+
+Use `logging.WithLogging` to wrap HTTP handlers for structured request logs.
+
 ```go
 import "github.com/andygeiss/cloud-native-utils/logging"
 
 logger := logging.NewJsonLogger()
-logger.Info("server started", "port", os.Getenv("PORT"))
-
-// HTTP middleware
-handler := logging.WithLogging(logger, yourHandler)
+mux.HandleFunc("GET /endpoint", logging.WithLogging(logger, handler))
 ```
-
-**Where it lives**: Application layer in `cmd/*/main.go`, adapters.
 
 ---
 
-### 3.8 `efficiency` — Concurrency Helpers
+### When NOT to Use
 
-**Import**: `github.com/andygeiss/cloud-native-utils/efficiency`
+| Scenario | Guidance |
+|----------|----------|
+| Domain logic | Never import vendor utilities into `internal/domain/*`. Domain should be pure Go with no external dependencies. |
+| Complex ORM needs | `resource` is for simple key-value CRUD. For complex relational queries, consider a dedicated ORM or query builder. |
+| High-throughput streaming | `efficiency` helpers are suitable for moderate workloads. For extreme throughput, evaluate specialized libraries. |
+| Platform-specific plugins | `extensibility.LoadPlugin` only works on supported OS/architectures. |
 
-| Function                           | Description                                      |
-|------------------------------------|--------------------------------------------------|
-| `Generate(values...)`              | Create read-only channel from values             |
-| `Merge(channels...)`               | Merge multiple channels into one                 |
-| `Split(ch, n)`                     | Fan-out to N worker channels                     |
-| `Process(ch, fn)`                  | Concurrent processing (NumCPU workers)           |
-| `WithCompression(handler)`         | HTTP gzip middleware                             |
+---
 
-**When to use**:  
-- Stream processing pipelines.
-- Fan-out/fan-in patterns.
-- HTTP response compression.
+## htmx
 
-**When NOT to use**:  
-- Simple sequential processing.
-- When explicit goroutine control is needed.
+| Property | Value |
+|----------|-------|
+| Website | [htmx.org](https://htmx.org) |
+| Documentation | [htmx.org/docs](https://htmx.org/docs/) |
+| Reference | [htmx.org/reference](https://htmx.org/reference/) |
+| Repository | [github.com/bigskysoftware/htmx](https://github.com/bigskysoftware/htmx) |
+| Version | 2.0.8 (embedded in static assets) |
+| Size | ~16kb min+gzip |
+| License | BSD 2-Clause |
 
-**Pattern**:
+### Purpose
+
+htmx extends HTML with attributes that enable AJAX requests, CSS transitions, WebSockets, and Server-Sent Events directly in markup—no custom JavaScript required. It enables hypermedia-driven applications where the server returns HTML fragments instead of JSON, keeping UI logic server-side.
+
+Use htmx instead of:
+- Writing custom `fetch()` calls for dynamic updates
+- Building SPA-style JavaScript frameworks
+- Complex client-side state management
+
+---
+
+### Core Attributes
+
+| Attribute | Purpose | Example |
+|-----------|---------|--------|
+| `hx-get` | Issue GET request | `<div hx-get="/items">` |
+| `hx-post` | Issue POST request | `<button hx-post="/submit">` |
+| `hx-put` | Issue PUT request | `<button hx-put="/update">` |
+| `hx-patch` | Issue PATCH request | `<button hx-patch="/partial">` |
+| `hx-delete` | Issue DELETE request | `<button hx-delete="/remove">` |
+| `hx-trigger` | Event that triggers request | `hx-trigger="click"`, `hx-trigger="load"`, `hx-trigger="revealed"` |
+| `hx-target` | Element to update with response | `hx-target="#result"`, `hx-target="closest tr"` |
+| `hx-swap` | How to swap content | `innerHTML`, `outerHTML`, `beforeend`, `afterbegin`, `delete` |
+| `hx-boost` | Progressive enhancement for links/forms | `<body hx-boost="true">` |
+| `hx-indicator` | Show during request | `hx-indicator="#spinner"` |
+| `hx-confirm` | Confirmation dialog | `hx-confirm="Are you sure?"` |
+| `hx-vals` | Include extra values | `hx-vals='{"key": "value"}'` |
+| `hx-headers` | Add request headers | `hx-headers='{"X-Custom": "value"}'` |
+
+---
+
+### Usage in This Template
+
+| Location | Purpose |
+|----------|--------|
+| [cmd/server/assets/static/js/htmx.min.js](cmd/server/assets/static/js/htmx.min.js) | Embedded htmx library |
+| [cmd/server/assets/templates/*.tmpl](cmd/server/assets/templates/) | Templates using htmx attributes |
+| [internal/adapters/inbound/http_*.go](internal/adapters/inbound/) | Handlers returning HTML fragments |
+
+**Integration with cloud-native-utils:**
+
+- `templating.Engine` renders HTML partials that htmx swaps into the DOM
+- `redirecting.WithPRG` handles Post-Redirect-Get compatible with htmx
+- `security.WithAuth` protects htmx endpoints the same as regular routes
+
+---
+
+### Recommended Patterns
+
+#### Basic AJAX Update
+
+```html
+<!-- Button that loads content into a target div -->
+<button hx-get="/api/data" hx-target="#result" hx-swap="innerHTML">
+    Load Data
+</button>
+<div id="result"></div>
+```
+
+#### Form Submission
+
+```html
+<!-- Form that submits via AJAX and replaces itself -->
+<form hx-post="/submit" hx-swap="outerHTML">
+    <input name="email" type="email" required>
+    <button type="submit">Subscribe</button>
+</form>
+```
+
+#### Progressive Enhancement
+
+```html
+<!-- Enable htmx for all links and forms in body -->
+<body hx-boost="true">
+    <a href="/page">This link uses AJAX</a>
+</body>
+```
+
+#### Loading Indicator
+
+```html
+<button hx-get="/slow" hx-indicator="#spinner">Load</button>
+<span id="spinner" class="htmx-indicator">Loading...</span>
+```
+
+#### Server Handler Pattern
+
+Handlers return HTML fragments, not JSON:
+
 ```go
-import "github.com/andygeiss/cloud-native-utils/efficiency"
-
-ch := efficiency.Generate(items...)
-results, errs := efficiency.Process(ch, processFn)
+// Return an HTML partial for htmx to swap
+func HandlePartial(e *templating.Engine) http.HandlerFunc {
+    return e.View("partial.tmpl", data)
+}
 ```
 
 ---
 
-### 3.9 `consistency` — Transactional Event Log
+### When NOT to Use
 
-**Import**: `github.com/andygeiss/cloud-native-utils/consistency`
-
-| Type / Function                          | Description                                  |
-|------------------------------------------|----------------------------------------------|
-| `NewJsonFileLogger[K, V](path)`          | File-backed transactional event log          |
-| `WritePut(key, value)`                   | Log a put event                              |
-| `WriteDelete(key)`                       | Log a delete event                           |
-| `ReadEvents()`                           | Replay events from log                       |
-
-**When to use**:  
-- Event sourcing or audit trails.
-- Durable operation logs.
-
-**When NOT to use**:  
-- High-throughput event streams (use Kafka via `messaging`).
-- When you need complex event querying.
+| Scenario | Guidance |
+|----------|----------|
+| Complex client-side state | For rich interactive apps with complex state, consider a JS framework |
+| Real-time collaboration | WebSocket-heavy apps may need more control than htmx provides |
+| Offline-first apps | htmx requires server connectivity; use service workers/PWA instead |
+| Third-party API integration | htmx is for your own server; external APIs need JavaScript |
 
 ---
 
-### 3.10 `templating` — HTML Templating
+## Adding New Vendors
 
-**Import**: `github.com/andygeiss/cloud-native-utils/templating`
+When introducing a new vendor library:
 
-| Type / Function                | Description                                      |
-|--------------------------------|--------------------------------------------------|
-| `NewEngine(fs)`                | Create engine from `embed.FS`                    |
-| `Parse(pattern)`               | Parse templates matching glob                    |
-| `Render(w, name, data)`        | Render template to writer                        |
-
-**When to use**:  
-- HTML rendering in HTTP handlers.
-- Use instead of rolling a custom template loader.
-
-**When NOT to use**:  
-- Non-HTML templating (JSON, YAML generation).
-- When you need advanced template inheritance beyond Go's `html/template`.
-
-**Pattern**:
-```go
-//go:embed templates/*.html
-var templatesFS embed.FS
-
-engine := templating.NewEngine(templatesFS)
-engine.Parse("templates/*.html")
-engine.Render(w, "page.html", data)
-```
+1. Justify the addition—does it solve a problem not covered by existing vendors?
+2. Add a section to this document following the same structure:
+   - Purpose statement
+   - Package reference table
+   - Usage in template (layer mapping)
+   - Recommended patterns
+   - When not to use
+3. Ensure the new vendor respects layering rules from `CONTEXT.md`.
 
 ---
 
-### 3.11 `slices` — Generic Slice Utilities
+## Deprecating Vendors
 
-**Import**: `github.com/andygeiss/cloud-native-utils/slices`
+When replacing or removing a vendor:
 
-| Function              | Description                          |
-|-----------------------|--------------------------------------|
-| `Map(slice, fn)`      | Transform each element               |
-| `Filter(slice, fn)`   | Filter elements by predicate         |
-| `Unique(slice)`       | Remove duplicates                    |
-| `Contains(slice, v)`  | Check membership                     |
-
-**When to use**:  
-- Functional-style slice transformations.
-- Prefer over hand-rolled loops for common operations.
-
-**When NOT to use**:  
-- Performance-critical hot paths where allocation matters.
-- When Go 1.21+ `slices` stdlib package suffices.
-
----
-
-### 3.12 `scheduling` — Time/Day Primitives
-
-**Import**: `github.com/andygeiss/cloud-native-utils/scheduling`
-
-| Type / Function                        | Description                              |
-|----------------------------------------|------------------------------------------|
-| `TimeOfDay`, `MustTimeOfDay(h, m)`     | Time-of-day value object                 |
-| `DayHours`, `NewDayHours(day, open, close)` | Opening hours for a weekday         |
-| Slot/gap utilities                     | Booking system helpers                   |
-
-**When to use**:  
-- Booking or scheduling features.
-- Business hours and slot management.
-
-**When NOT to use**:  
-- Simple timestamp comparisons.
-- Cron-style job scheduling (use dedicated schedulers).
-
----
-
-### 3.13 `redirecting` — PRG Pattern
-
-**Import**: `github.com/andygeiss/cloud-native-utils/redirecting`
-
-| Function / Type                        | Description                              |
-|----------------------------------------|------------------------------------------|
-| `WithPRG(handler)`                     | Middleware for POST/Redirect/GET         |
-| `Redirect(w, r, url)`                  | Standard redirect                        |
-| `RedirectWithMessage(w, r, url, msg)`  | Redirect with flash message              |
-
-**When to use**:  
-- Web forms following POST/Redirect/GET pattern.
-- HTMX-compatible redirects.
-
----
-
-### 3.14 `i18n` — Internationalization
-
-**Import**: `github.com/andygeiss/cloud-native-utils/i18n`
-
-| Function / Type                        | Description                              |
-|----------------------------------------|------------------------------------------|
-| `NewTranslations()`                    | Create translation store                 |
-| `Load(fs, lang, path)`                 | Load YAML translations from embed.FS     |
-| `T(lang, key)`                         | Get translated text                      |
-| `FormatDateISO`, `FormatMoney`         | Locale-aware formatting                  |
-
-**When to use**:  
-- Multi-language applications.
-- Locale-aware date/currency formatting.
-
----
-
-### 3.15 `imaging` — QR Code Generation
-
-**Import**: `github.com/andygeiss/cloud-native-utils/imaging`
-
-| Function                               | Description                              |
-|----------------------------------------|------------------------------------------|
-| `GenerateQRCodeDataURL(content)`       | Generate QR code as data URL             |
-
-**When to use**:  
-- QR code features in web applications.
-
----
-
-### 3.16 `extensibility` — Plugin Loading
-
-**Import**: `github.com/andygeiss/cloud-native-utils/extensibility`
-
-| Function                               | Description                              |
-|----------------------------------------|------------------------------------------|
-| `LoadPlugin[T](path, symbol)`          | Load Go plugin dynamically               |
-
-**When to use**:  
-- Plugin architectures requiring runtime extension.
-
-**When NOT to use**:  
-- Cross-platform applications (plugins are OS-specific).
-- When compile-time composition is sufficient.
-
----
-
-## 4. Integration Guidelines
-
-### 4.1 Where Vendor Code Lives
-
-| Integration Type                | Location                              |
-|---------------------------------|---------------------------------------|
-| Repository implementations      | `internal/adapters/outbound/`         |
-| Event publishers                | `internal/adapters/outbound/`         |
-| HTTP server setup               | `cmd/*/main.go`                       |
-| Stability wrappers              | `internal/adapters/outbound/` (wrap external calls) |
-| Test assertions                 | `*_test.go` (same directory as code)  |
-| Templating engine               | `cmd/*/main.go` or dedicated handler adapter |
-| Logging                         | `cmd/*/main.go`, `internal/adapters/` |
-
-### 4.2 Domain Layer Rules
-
-- **Never import `cloud-native-utils` directly in domain code** except:
-  - Type aliases for ports (e.g., `type IndexRepository resource.Access[K, V]`).
-- Domain logic remains infrastructure-agnostic.
-
-### 4.3 Recommended Defaults
-
-| Concern                   | Default Pattern                                              |
-|---------------------------|--------------------------------------------------------------|
-| Repository port           | `type XRepository resource.Access[K, V]`                     |
-| JSON persistence          | `resource.NewJsonFileAccess[K, V](filename)`                 |
-| In-memory (tests)         | `resource.NewInMemoryAccess[K, V]()`                         |
-| Mock (tests)              | `resource.NewMockAccess[K, V]()`                             |
-| Test assertions           | `assert.That(t, message, got, want)`                         |
-| External call resilience  | `stability.Retry(stability.Breaker(fn, 3), 5, time.Second)`  |
-| Signal-aware context      | `ctx, cancel := service.Context()`                           |
-| Secure HTTP server        | `security.NewServer(mux)`                                    |
-| Structured logging        | `logging.NewJsonLogger()`                                    |
-
----
-
-## 5. Checklist: Before Adding New Utilities
-
-When implementing cross-cutting functionality:
-
-1. **Search `cloud-native-utils`** for existing coverage.
-2. **Consult this document** for recommended patterns.
-3. **If covered**: Use the vendor package; add integration in adapters.
-4. **If not covered**: Document the gap and implement minimally in `internal/`.
-5. **Update `VENDOR.md`** if introducing a new vendor or new usage pattern.
-
----
-
-## 6. Environment Variables
-
-The following environment variables are used by `cloud-native-utils`:
-
-| Variable              | Package      | Description                              | Default  |
-|-----------------------|--------------|------------------------------------------|----------|
-| `PORT`                | `security`   | HTTP server port                         | `8080`   |
-| `SERVER_READ_TIMEOUT` | `security`   | HTTP read timeout                        | `5s`     |
-| `SERVER_WRITE_TIMEOUT`| `security`   | HTTP write timeout                       | `10s`    |
-| `SERVER_IDLE_TIMEOUT` | `security`   | HTTP idle timeout                        | `120s`   |
-| `LOGGING_LEVEL`       | `logging`    | Log level (debug, info, warn, error)     | `info`   |
-| `KAFKA_BROKERS`       | `messaging`  | Kafka broker addresses (comma-separated) | —        |
-| `OIDC_CLIENT_ID`      | `security`   | OIDC client identifier                   | —        |
-| `OIDC_CLIENT_SECRET`  | `security`   | OIDC client secret                       | —        |
-| `OIDC_ISSUER`         | `security`   | OIDC issuer URL                          | —        |
-| `OIDC_REDIRECT_URL`   | `security`   | OIDC callback URL                        | —        |
-
----
-
-## 7. Version Notes
-
-| Version | Notable Changes                                              |
-|---------|--------------------------------------------------------------|
-| v0.4.8  | `resource.Access` made public; current template version      |
-
-When upgrading `cloud-native-utils`:
-- Review the [releases page](https://github.com/andygeiss/cloud-native-utils/releases).
-- Check for breaking changes in packages this template uses.
-- Update this document if APIs change significantly.
-
----
-
-## 8. Quick Reference Table
-
-| Need                        | Package        | Function/Type                            |
-|-----------------------------|----------------|------------------------------------------|
-| Test assertions             | `assert`       | `That(t, msg, got, want)`                |
-| Key-value storage           | `resource`     | `Access[K, V]`, `NewJsonFileAccess`      |
-| Pub/sub events              | `messaging`    | `Dispatcher`, `NewInternalDispatcher`    |
-| Circuit breaker             | `stability`    | `Breaker(fn, threshold)`                 |
-| Retry logic                 | `stability`    | `Retry(fn, attempts, delay)`             |
-| Rate limiting               | `stability`    | `Throttle(fn, maxConcurrent)`            |
-| Graceful shutdown           | `service`      | `Context()`, `RegisterOnContextDone`     |
-| Password hashing            | `security`     | `Password(pw)`, `IsPasswordValid`        |
-| AES encryption              | `security`     | `Encrypt`, `Decrypt`, `GenerateKey`      |
-| Secure HTTP server          | `security`     | `NewServer(handler)`                     |
-| OIDC authentication         | `security`     | `IdentityProvider`                       |
-| JSON logging                | `logging`      | `NewJsonLogger()`                        |
-| HTTP request logging        | `logging`      | `WithLogging(logger, handler)`           |
-| HTML templating             | `templating`   | `NewEngine(fs)`, `Render`                |
-| Slice operations            | `slices`       | `Map`, `Filter`, `Unique`, `Contains`    |
-| Concurrency pipelines       | `efficiency`   | `Generate`, `Merge`, `Split`, `Process`  |
-| HTTP compression            | `efficiency`   | `WithCompression(handler)`               |
-| Event sourcing log          | `consistency`  | `NewJsonFileLogger[K, V]`                |
-| Business hours/scheduling   | `scheduling`   | `TimeOfDay`, `DayHours`                  |
-| PRG redirects               | `redirecting`  | `WithPRG`, `Redirect`                    |
-| Translations                | `i18n`         | `NewTranslations()`, `T(lang, key)`      |
-| QR codes                    | `imaging`      | `GenerateQRCodeDataURL`                  |
-
----
-
-*Last updated: 2026-01-04*
+1. Mark the section as **DEPRECATED** with a note and migration guidance.
+2. Update all references in the codebase.
+3. Remove the deprecated section after migration is complete.

@@ -54,6 +54,7 @@ import sys
 # These should be the core domains and adapters where performance matters most.
 PACKAGES_TO_PROFILE = [
     "cmd/cli",
+    "cmd/server",
     "internal/adapters/inbound",
     "internal/adapters/outbound"
 ]

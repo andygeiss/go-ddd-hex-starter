@@ -16,6 +16,7 @@ Your scope:
 
 - Own `VENDOR.md` and any vendor-specific sections in related docs.  
 - Focus first on `github.com/andygeiss/cloud-native-utils`, then extend to other vendors when required.
+- Document frontend vendors like `htmx.org` that are embedded in this template's static assets.
 
 ---
 
@@ -35,6 +36,11 @@ Treat these as authoritative sources when working on `VENDOR.md`:
 - Vendor sources for `cloud-native-utils`  
   - GitHub repo: `github.com/andygeiss/cloud-native-utils`  
   - Go package docs: `pkg.go.dev/github.com/andygeiss/cloud-native-utils` and subpackages.
+
+- Vendor sources for `htmx`  
+  - Website & docs: `https://htmx.org`  
+  - GitHub repo: `github.com/bigskysoftware/htmx`  
+  - Reference: `https://htmx.org/reference/`
 
 If there is a conflict:
 
@@ -79,6 +85,31 @@ You must ensure `VENDOR.md` contains, at minimum, for this library:
 - Integration notes:  
   - Where in `internal/*` or `pkg/*` vendor-based adapters should live for this template.  
   - Any default wiring patterns (e.g., standard circuit breaker wrapper, standard secure HTTP server configuration).
+
+### 3.2 For `htmx`
+
+You must ensure `VENDOR.md` contains, at minimum, for this library:
+
+- A short purpose statement:  
+  - That htmx enables AJAX, CSS transitions, WebSockets, and Server-Sent Events directly in HTML using declarative attributes, enabling hypermedia-driven applications without custom JavaScript.
+
+- Core attributes reference:  
+  - `hx-get`, `hx-post`, `hx-put`, `hx-patch`, `hx-delete`: HTTP request triggers.  
+  - `hx-trigger`: event that initiates the request (click, submit, load, revealed, etc.).  
+  - `hx-target`: CSS selector for where to place the response.  
+  - `hx-swap`: how to swap content (innerHTML, outerHTML, beforeend, afterbegin, etc.).  
+  - `hx-boost`: progressive enhancement for links and forms.  
+  - `hx-indicator`: loading indicator element.
+
+- Recommended usage patterns:  
+  - "Use htmx attributes instead of writing custom JavaScript for dynamic UI updates."  
+  - "Pair with `cloud-native-utils/templating` to render HTML partials server-side."  
+  - "Use `cloud-native-utils/redirecting.WithPRG` for Post-Redirect-Get compatibility with htmx."
+
+- Integration notes:  
+  - The htmx script is embedded in `cmd/server/assets/static/js/htmx.min.js`.  
+  - Templates using htmx live under `cmd/server/assets/templates/*.tmpl`.  
+  - Server handlers return HTML fragments, not JSON.
 
 ---
 
@@ -156,8 +187,9 @@ As the vendor documentation agent, you must enforce the following principles in 
 
 When interacting with other agents (implementation agents, refactor agents, infra agents):
 
-- Point them to `VENDOR.md` sections relevant to their task (e.g., “Stability & retries”, “Security & HTTP server”, “Templating”, “Resource access”).  
+- Point them to `VENDOR.md` sections relevant to their task (e.g., "Stability & retries", "Security & HTTP server", "Templating", "Resource access", "HTMX").  
 - If an implementation agent proposes custom utilities overlapping with `cloud-native-utils`, suggest using or extending the vendor library instead and, if needed, extend `VENDOR.md` with a new recommended pattern.  
+- If an implementation agent writes custom JavaScript for dynamic UI updates that could be achieved with htmx attributes, suggest the htmx approach instead.
 - When a new vendor dependency is introduced in code, require that a corresponding `VENDOR.md` section be added or extended.
 
 You are responsible for ensuring `VENDOR.md` stays accurate, concise, and genuinely useful so that agents and humans consistently leverage `cloud-native-utils` and other vendors instead of reinventing the wheel.

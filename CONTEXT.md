@@ -1,24 +1,21 @@
 # CONTEXT.md
 
-> **Project context** for AI coding agents, retrieval systems, and developers.  
-> This file is the authoritative reference for architecture, conventions, and contracts in this repository.
+This file is the authoritative project context for AI coding agents, retrieval systems, and advanced developers working on this codebase.
 
 ---
 
 ## 1. Project Purpose
 
-**go-ddd-hex-starter** is a production-ready Go template demonstrating Domain-Driven Design (DDD) and Hexagonal Architecture (Ports and Adapters).
+This repository is a **production-ready Go template** that demonstrates Domain-Driven Design (DDD) and Hexagonal Architecture (Ports & Adapters) patterns. It provides a complete foundation for building cloud-native applications with:
 
-It provides:
+- Clean separation of domain logic from infrastructure concerns
+- Event-driven architecture with pub/sub messaging
+- OIDC authentication via Keycloak
+- HTTP server with HTMX-powered UI
+- Profile-Guided Optimization (PGO) for performance
+- Docker/Podman containerization with multi-stage builds
 
-- A **reusable blueprint** for building maintainable Go applications with well-defined boundaries.
-- A **reference implementation** of the Ports and Adapters pattern with working examples.
-- A **template** for developers and AI coding agents that need a consistent, well-documented structure to extend.
-
-The included examples demonstrate:
-
-- A **CLI tool** that indexes files in a directory and persists the result to JSON.
-- An **HTTP server** with OIDC authentication, templating, and session management.
+The template serves as a **reference implementation** for AI coding agents and developers to spin up new Go projects following established architectural patterns and conventions.
 
 ---
 
@@ -27,134 +24,165 @@ The included examples demonstrate:
 | Category | Technology |
 |----------|------------|
 | **Language** | Go 1.25+ |
-| **Architecture** | Hexagonal (Ports and Adapters), Domain-Driven Design |
-| **HTTP Framework** | `net/http` (standard library) |
-| **Authentication** | OIDC via `cloud-native-utils/security` |
-| **Templating** | `cloud-native-utils/templating` with `html/template` |
-| **Logging** | `log/slog` + `cloud-native-utils/logging` (JSON structured logs) |
-| **Messaging** | `cloud-native-utils/messaging` (pub/sub dispatcher) |
-| **Persistence** | `cloud-native-utils/resource` (generic CRUD, JSON file storage) |
-| **Testing** | Standard `testing` + `cloud-native-utils/assert` |
-| **Build** | `go build` with Profile-Guided Optimization (PGO) |
-| **Task Runner** | `just` (justfile) |
-| **Containers** | Docker/Podman, multi-stage builds, scratch runtime |
-| **External Services** | Keycloak (OIDC provider), Kafka (event streaming) — optional |
-
-**Primary vendor library**: `github.com/andygeiss/cloud-native-utils` v0.4.8
+| **Architecture** | Domain-Driven Design, Hexagonal Architecture |
+| **HTTP Framework** | `net/http` (stdlib) with `cloud-native-utils/security` |
+| **Frontend** | HTMX, HTML templates |
+| **Authentication** | OpenID Connect (OIDC) via Keycloak |
+| **Messaging** | Internal pub/sub or Apache Kafka via `cloud-native-utils/messaging` |
+| **Build/Task Runner** | `just` (justfile) |
+| **Containerization** | Docker/Podman with multi-stage builds |
+| **Orchestration** | Docker Compose |
+| **Profiling** | Go PGO with benchmark-driven profiles |
+| **Vendor Library** | `github.com/andygeiss/cloud-native-utils` v0.4.8 |
 
 ---
 
 ## 3. High-Level Architecture
 
-The project implements **Hexagonal Architecture** with three distinct layers:
+This template follows **Hexagonal Architecture** (Ports & Adapters) with **Domain-Driven Design** principles:
 
 ```
-┌──────────────────────────────────────────────────────────────┐
-│                    Application Layer                         │
-│                  cmd/cli/main.go                             │
-│                  cmd/server/main.go                          │
-│        (Entry points, wire adapters to domain)               │
-└─────────────────────────┬────────────────────────────────────┘
-                          │
-┌─────────────────────────▼────────────────────────────────────┐
-│                       Domain Layer                           │
-│                   internal/domain/                           │
-│    (Pure business logic, defines Ports as interfaces)        │
-└─────────────────────────▲────────────────────────────────────┘
-                          │
-┌─────────────────────────┴────────────────────────────────────┐
-│  ┌────────────────┐           ┌──────────────────┐           │
-│  │ Inbound        │───────────│ Outbound         │           │
-│  │ Adapters       │           │ Adapters         │           │
-│  │ (Driving)      │           │ (Driven)         │           │
-│  └────────────────┘           └──────────────────┘           │
-│                     Adapters Layer                           │
-│                 internal/adapters/                           │
-└──────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        cmd/ (Entry Points)                       │
+│   ┌─────────────┐                      ┌─────────────┐          │
+│   │   cli/      │                      │   server/   │          │
+│   │  main.go    │                      │   main.go   │          │
+│   └──────┬──────┘                      └──────┬──────┘          │
+└──────────┼─────────────────────────────────────┼────────────────┘
+           │                                     │
+           ▼                                     ▼
+┌─────────────────────────────────────────────────────────────────┐
+│               internal/adapters/ (Infrastructure)                │
+│   ┌────────────────────────┐    ┌────────────────────────┐      │
+│   │       inbound/         │    │       outbound/        │      │
+│   │  - HTTP handlers       │    │  - Repositories        │      │
+│   │  - File readers        │    │  - Event publishers    │      │
+│   │  - Event subscribers   │    │  - External services   │      │
+│   │  - Router, Middleware  │    │                        │      │
+│   └───────────┬────────────┘    └────────────┬───────────┘      │
+└───────────────┼──────────────────────────────┼──────────────────┘
+                │         Ports (Interfaces)   │
+                ▼                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    internal/domain/ (Core)                       │
+│   ┌────────────────────────┐    ┌────────────────────────┐      │
+│   │        event/          │    │       indexing/        │      │
+│   │  - Event interface     │    │  - Aggregate (Index)   │      │
+│   │  - Publisher port      │    │  - Entities (FileInfo) │      │
+│   │  - Subscriber port     │    │  - Value Objects       │      │
+│   │  - Factory/Handler     │    │  - Domain Events       │      │
+│   │                        │    │  - Ports (interfaces)  │      │
+│   │                        │    │  - Service             │      │
+│   └────────────────────────┘    └────────────────────────┘      │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Layer Responsibilities
+### Architectural Layers
 
 | Layer | Location | Responsibility |
 |-------|----------|----------------|
-| **Domain** | `internal/domain/` | Pure business logic. Defines Ports (interfaces). Zero infrastructure knowledge. |
-| **Adapters** | `internal/adapters/` | Infrastructure implementations. Inbound = driving; Outbound = driven. |
-| **Application** | `cmd/` | Entry points that wire adapters to domain services via dependency injection. |
+| **Domain** | `internal/domain/` | Pure business logic, aggregates, entities, value objects, domain events, port interfaces |
+| **Adapters** | `internal/adapters/` | Infrastructure implementations (HTTP, filesystem, messaging, persistence) |
+| **Application** | `cmd/` | Entry points, dependency wiring, lifecycle management |
 
-### Dependency Rule
+### Data Flow
 
-Source code dependencies point **inward** only:
-
-- `adapters` depends on `domain`
-- `domain` depends on **nothing** (no infrastructure imports)
+1. **Inbound adapters** receive external requests (HTTP, events, CLI)
+2. **Domain services** orchestrate business workflows using domain objects
+3. **Outbound adapters** persist state or publish events to external systems
+4. **Domain events** decouple bounded contexts via pub/sub
 
 ---
 
 ## 4. Directory Structure (Contract)
 
 ```
-go-ddd-hex-starter/
-├── .justfile                 # Task runner commands (build, test, profile, run, serve)
-├── go.mod                    # Go module definition (Go 1.25+)
-├── CONTEXT.md                # AI/developer context documentation (this file)
-├── VENDOR.md                 # Vendor library documentation (cloud-native-utils)
-├── README.md                 # User-facing documentation
-├── Dockerfile                # Multi-stage container build
-├── docker-compose.yml        # Dev stack (Keycloak, Kafka, app)
-├── cpuprofile.pprof          # PGO profile data (auto-generated)
-├── coverage.pprof            # Test coverage data (auto-generated)
-├── bin/                      # Compiled binaries (gitignored)
-├── tools/                    # Build/dev scripts (Python helpers)
-├── cmd/                      # Application entry points
-│   ├── cli/                  # CLI application
-│   │   ├── main.go           # Wires adapters, runs file indexing
-│   │   ├── main_test.go      # Benchmarks for PGO
-│   │   └── assets/           # Embedded assets (embed.FS)
-│   └── server/               # HTTP server application
-│       ├── main.go           # Wires adapters, starts server with OIDC
-│       └── assets/
-│           ├── static/       # CSS, JS (base.css, htmx.min.js, theme.css)
-│           └── templates/    # HTML templates (index.tmpl, login.tmpl)
-└── internal/
-    ├── adapters/             # Infrastructure implementations
-    │   ├── inbound/          # Driving adapters (filesystem, HTTP handlers, routing)
-    │   │   ├── file_reader.go
-    │   │   ├── router.go
-    │   │   ├── http_index.go
-    │   │   ├── http_login.go
-    │   │   ├── http_view.go
-    │   │   └── middleware.go
-    │   └── outbound/         # Driven adapters (persistence, messaging)
-    │       ├── file_index_repository.go
-    │       └── event_publisher.go
-    └── domain/               # Pure business logic
-        ├── event/            # Domain event interface
-        │   └── event.go
-        └── indexing/         # Bounded Context: Indexing
-            ├── aggregate.go      # Aggregate Root (Index)
-            ├── entities.go       # Entities (FileInfo)
-            ├── value_objects.go  # Value Objects (IndexID) + Domain Events
-            ├── service.go        # Domain Service (IndexingService)
-            ├── ports_inbound.go  # Interfaces for driving adapters
-            └── ports_outbound.go # Interfaces for driven adapters
+.
+├── .github/
+│   └── agents/              # AI agent configuration files
+├── cmd/
+│   ├── cli/                 # CLI application entry point
+│   │   ├── main.go
+│   │   ├── main_test.go     # Benchmarks for PGO
+│   │   └── assets/          # Embedded CLI assets
+│   └── server/              # HTTP server entry point
+│       ├── main.go
+│       ├── main_test.go     # Benchmarks for PGO
+│       └── assets/          # Embedded web assets (templates, static)
+├── internal/
+│   ├── adapters/
+│   │   ├── inbound/         # Driving adapters (HTTP, filesystem, events)
+│   │   │   ├── router.go           # HTTP route registration
+│   │   │   ├── middleware.go       # HTTP middleware (logging, security)
+│   │   │   ├── http_*.go           # HTTP handlers
+│   │   │   ├── file_reader.go      # Filesystem adapter
+│   │   │   └── event_subscriber.go # Event subscription adapter
+│   │   └── outbound/        # Driven adapters (repositories, publishers)
+│   │       ├── file_index_repository.go  # Persistence adapter
+│   │       └── event_publisher.go        # Event publishing adapter
+│   └── domain/
+│       ├── event/           # Cross-cutting event abstractions
+│       │   ├── event.go            # Event interface
+│       │   ├── event_factory.go    # EventFactoryFn type
+│       │   ├── event_handler.go    # EventHandlerFn type
+│       │   ├── event_publisher.go  # EventPublisher port
+│       │   └── event_subscriber.go # EventSubscriber port
+│       └── indexing/        # Example bounded context
+│           ├── aggregate.go        # Index aggregate root
+│           ├── entities.go         # FileInfo entity
+│           ├── value_objects.go    # IndexID value object
+│           ├── events.go           # Domain events
+│           ├── ports_inbound.go    # FileReader port
+│           ├── ports_outbound.go   # IndexRepository port
+│           └── service.go          # IndexingService
+├── tools/                   # Python utilities for development
+│   ├── change_me_local_secret.py   # Keycloak secret rotation
+│   └── create_pgo.py               # PGO profile generation
+├── .env.example             # Environment variable template
+├── .justfile                # Task runner configuration
+├── .keycloak.json.example   # Keycloak realm template
+├── docker-compose.yml       # Development stack (Keycloak, Kafka, App)
+├── Dockerfile               # Multi-stage production build
+├── go.mod                   # Go module definition
+├── CONTEXT.md               # This file (AI agent context)
+├── README.md                # Human-facing documentation
+└── VENDOR.md                # Vendor library documentation
 ```
 
 ### Rules for New Code
 
-| What to Add | Where It Goes |
-|-------------|---------------|
-| New bounded context | `internal/domain/<context_name>/` |
-| New aggregate or entity | `internal/domain/<context>/aggregate.go` or `entities.go` |
-| New value object | `internal/domain/<context>/value_objects.go` |
-| New domain event | `internal/domain/<context>/value_objects.go` (with `Topic()` method) |
-| New inbound port | `internal/domain/<context>/ports_inbound.go` |
-| New outbound port | `internal/domain/<context>/ports_outbound.go` |
-| New driving adapter (HTTP, CLI) | `internal/adapters/inbound/<adapter_name>.go` |
-| New driven adapter (DB, queue) | `internal/adapters/outbound/<adapter_name>.go` |
-| New application entry point | `cmd/<app_name>/main.go` |
-| Tests | `<filename>_test.go` (same directory) |
-| Static assets | `cmd/<app>/assets/static/` |
-| Templates | `cmd/<app>/assets/templates/` |
+#### Adding a new bounded context (domain)
+
+1. Create a new package under `internal/domain/<context>/`
+2. Define aggregates, entities, and value objects
+3. Define domain events in `events.go`
+4. Define inbound ports in `ports_inbound.go`
+5. Define outbound ports in `ports_outbound.go`
+6. Implement the domain service in `service.go`
+7. Add tests in `*_test.go` files within the same package
+
+#### Adding a new inbound adapter
+
+1. Place implementation in `internal/adapters/inbound/`
+2. Implement the port interface defined in the domain
+3. Name HTTP handlers as `http_<feature>.go`
+4. Register routes in `router.go`
+5. Add tests in `<adapter>_test.go`
+
+#### Adding a new outbound adapter
+
+1. Place implementation in `internal/adapters/outbound/`
+2. Implement the port interface defined in the domain
+3. Prefer reusing `cloud-native-utils/resource` for persistence
+4. Prefer reusing `cloud-native-utils/messaging` for pub/sub
+5. Add tests in `<adapter>_test.go`
+
+#### Adding new entry points
+
+1. Create a new package under `cmd/<name>/`
+2. Wire dependencies in `main.go`
+3. Embed assets using `//go:embed assets`
+4. Add benchmarks in `main_test.go` for PGO
 
 ---
 
@@ -162,216 +190,241 @@ go-ddd-hex-starter/
 
 ### 5.1 General
 
-- Keep modules small and focused on a single responsibility.
-- Prefer pure functions where possible.
-- Respect layer boundaries: domain code must not import infrastructure packages.
-- Dependency injection via constructors: wire adapters to domain services in `cmd/*/main.go`.
-- Embedded assets via `embed.FS` for portability.
+- Keep modules small and focused on a single responsibility
+- Prefer composition over inheritance
+- Domain logic must have zero infrastructure dependencies
+- Use dependency injection via interfaces (ports)
+- Pass `context.Context` through all layers for cancellation and timeouts
+- Services orchestrate workflows; adapters handle I/O
 
 ### 5.2 Naming
 
 | Element | Convention | Example |
 |---------|------------|---------|
-| Files | `snake_case.go` | `file_reader.go`, `http_index.go` |
-| Packages | lowercase, singular | `indexing`, `event`, `inbound` |
-| Interfaces | Noun describing capability | `FileReader`, `IndexRepository` |
-| Structs | PascalCase noun | `Index`, `FileInfo`, `EventPublisher` |
-| Methods | PascalCase verb phrase | `ReadFileInfos`, `CreateIndex` |
-| Constructors | `New<Type>()` | `NewIndex()`, `NewFileReader()` |
-| Value Objects | PascalCase, `ID` suffix for identifiers | `IndexID` |
-| Domain Events | `Event<Action>` | `EventFileIndexCreated` |
-| HTTP Handlers | `Http<View/Action><Name>` | `HttpViewIndex`, `HttpViewLogin` |
-| Middleware | `With<Capability>` | `WithLogging`, `WithSecurityHeaders` |
-| Tests | `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>` | `Test_Index_Hash_With_No_FileInfos_Should_Return_Valid_Hash` |
-| Benchmarks | `Benchmark_<Struct>_<Method>_With_<Condition>_Should_<Result>` | `Benchmark_Main_With_Inbound_And_Outbound_Adapters_Should_Run_Efficiently` |
+| **Packages** | Lowercase, single word | `indexing`, `inbound`, `outbound` |
+| **Files** | Snake_case | `file_reader.go`, `event_publisher.go` |
+| **Aggregates** | PascalCase noun | `Index`, `Order`, `User` |
+| **Entities** | PascalCase noun | `FileInfo`, `LineItem` |
+| **Value Objects** | PascalCase with `ID` suffix for identifiers | `IndexID`, `OrderID` |
+| **Interfaces (ports)** | PascalCase noun describing capability | `FileReader`, `IndexRepository`, `EventPublisher` |
+| **Services** | PascalCase with `Service` suffix | `IndexingService` |
+| **Events** | PascalCase with `Event` prefix | `EventFileIndexCreated` |
+| **Event topics** | Constant with `EventTopic` prefix | `EventTopicFileIndexCreated` |
+| **HTTP handlers** | `HttpView<Name>` or `Http<Action><Resource>` | `HttpViewIndex`, `HttpViewLogin` |
+| **Test functions** | `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>` | `Test_IndexingService_CreateIndex_With_Mockup_Should_Return_Two_Entries` |
+| **Benchmark functions** | `Benchmark_<Struct>_<Method>_With_<Condition>_Should_<Result>` | `Benchmark_FileReader_ReadFileInfos_With_1000_Entries_Should_Be_Fast` |
 
 ### 5.3 Error Handling & Logging
 
-**Error Handling**:
+**Error handling:**
+- Return errors up the call stack; let the entry point decide how to handle them
+- Wrap errors with context using `fmt.Errorf("context: %w", err)` when adding information
+- Domain logic returns domain-specific errors; adapters translate them
+- Never panic except for truly unrecoverable programmer errors
 
-- Return errors from functions; do not panic except for unrecoverable situations.
-- Errors propagate upward through the call stack to the application layer.
-- Domain layer returns plain errors; adapters may wrap errors with context.
-
-**Logging**:
-
-- Use `log/slog` with `cloud-native-utils/logging.NewJsonLogger()` for structured JSON logs.
-- Log at the adapter/application layer, not in domain code.
-- Standard log levels: `Info`, `Error`, `Debug`.
-- Include contextual fields: `"method"`, `"path"`, `"duration"`, `"reason"`.
+**Logging:**
+- Use `cloud-native-utils/logging.NewJsonLogger()` for structured JSON logs
+- Use `logging.WithLogging(logger, handler)` middleware for HTTP request logging
+- Log levels: `Info` for normal operations, `Error` for failures
+- Include correlation data: method, path, duration for HTTP; topic, event type for messaging
 
 ### 5.4 Testing
 
-**Framework**: Standard `testing` package + `cloud-native-utils/assert`.
+**Framework:** Go stdlib `testing` package with `cloud-native-utils/assert`
 
-**Pattern**: Arrange-Act-Assert (AAA).
+**Patterns:**
+- Follow Arrange-Act-Assert (AAA) pattern
+- Use table-driven tests for multiple scenarios
+- Mock dependencies using interface implementations
+- Use `resource.NewMockAccess[K, V]()` for repository mocks
 
+**Naming:** `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>`
+
+**Organization:**
+- Unit tests in `*_test.go` files alongside source files
+- Use `_test` package suffix for black-box testing (e.g., `indexing_test`)
+- Benchmarks in entry point test files (`cmd/*/main_test.go`) for PGO
+
+**Example:**
 ```go
-func Test_Index_Hash_With_No_FileInfos_Should_Return_Valid_Hash(t *testing.T) {
+func Test_IndexingService_CreateIndex_With_Mockup_Should_Return_Two_Entries(t *testing.T) {
     // Arrange
-    index := indexing.Index{ID: "empty-index", FileInfos: []indexing.FileInfo{}}
+    sut, _ := setupIndexingService()
+    path := "testdata/index.json"
+    ctx := context.Background()
 
     // Act
-    hash := index.Hash()
+    err := sut.CreateIndex(ctx, path)
+    files, err2 := sut.IndexFiles(ctx, path)
 
     // Assert
-    assert.That(t, "empty index must have a valid hash (size of 64 bytes)", len(hash), 64)
+    assert.That(t, "err must be nil", err == nil, true)
+    assert.That(t, "err2 must be nil", err2 == nil, true)
+    assert.That(t, "index must have two entries", len(files) == 2, true)
 }
 ```
 
-**Test file location**: Same directory as source, suffix `_test.go`.
-
-**Mocking**: Use `resource.NewMockAccess[K, V]()` for repository mocks. Create simple structs implementing interfaces for other mocks.
-
-**Coverage**: Run `just test` or `go test -coverprofile=coverage.pprof ./internal/...`.
-
 ### 5.5 Formatting & Linting
 
-- Use `gofmt` or `goimports` for formatting (default Go toolchain).
-- No external linter configuration files in this template—relies on Go defaults.
-- Consistent import grouping: standard library, external packages, internal packages.
-
-### 5.6 Context Propagation
-
-- Always pass `context.Context` as the first parameter.
-- Create contexts in inbound adapters or application layer (`context.Background()`).
-- Never create contexts in domain code.
-- Respect context cancellation in long-running operations.
+- Use `gofmt` or `goimports` for formatting
+- No explicit linter configuration in this template (relies on Go defaults)
+- Follow standard Go idioms and effective Go guidelines
 
 ---
 
 ## 6. Agent-Specific Patterns
 
-This repository does not contain AI agents, but serves as a **template for agent-based projects**. The patterns below apply to extending this template for agent use cases.
+### Domain Event Flow
 
-### Domain Structure for Agents
+```
+Domain Service → Event Publisher (port) → Outbound Adapter → Messaging Dispatcher
+                                                                    │
+                                                                    ▼
+Domain Handler ← Event Subscriber (port) ← Inbound Adapter ← Messaging Dispatcher
+```
 
-If adding agent capabilities:
+### Event Structure
 
-1. Create a new bounded context: `internal/domain/agents/`
-2. Define agent entities in `entities.go` (agent state, configuration).
-3. Define inbound ports in `ports_inbound.go` (interfaces for invoking agents).
-4. Define outbound ports in `ports_outbound.go` (interfaces for tools, LLM calls, memory).
-5. Implement service orchestration in `service.go`.
+Events implement the `event.Event` interface:
 
-### Tool Registration Pattern
+```go
+type Event interface {
+    Topic() string
+}
+```
 
-Tools (external capabilities for agents) follow the adapter pattern:
+Events are defined in the bounded context (`internal/domain/<context>/events.go`):
 
-- Define tool interface in domain layer (`ports_outbound.go`).
-- Implement tool adapter in `internal/adapters/outbound/`.
-- Wire tool to service via constructor injection in `cmd/*/main.go`.
+```go
+type EventFileIndexCreated struct {
+    IndexID   IndexID `json:"index_id"`
+    FileCount int     `json:"file_count"`
+}
 
-### Prompt and Workflow Organization
+func (e *EventFileIndexCreated) Topic() string {
+    return EventTopicFileIndexCreated
+}
+```
 
-- Store prompt templates in `cmd/<app>/assets/templates/` (embedded via `embed.FS`).
-- Implement workflow orchestration in domain services.
-- Keep prompts as data (templates), not hardcoded strings in Go code.
+### Adding a New Domain Event
 
-### Checklist: Adding a New Agent
+1. Define the event struct in `internal/domain/<context>/events.go`
+2. Add a topic constant: `EventTopic<Name>`
+3. Implement `Topic() string` method
+4. Use builder pattern with `New<Event>()` and `With<Field>()` methods
+5. Publish via the `EventPublisher` port in the domain service
+6. Subscribe via `EventSubscriber.Subscribe(ctx, topic, factory, handler)`
 
-1. Create bounded context in `internal/domain/<agent_name>/`.
-2. Define `entities.go`, `value_objects.go`, `ports_inbound.go`, `ports_outbound.go`.
-3. Implement `service.go` for orchestration.
-4. Create adapters in `internal/adapters/inbound/` (trigger) and `outbound/` (tools).
-5. Wire in `cmd/<app>/main.go`.
-6. Add tests following naming conventions.
+### Adding a New Inbound Adapter (HTTP Handler)
 
-### Checklist: Adding a New Tool
+1. Create `internal/adapters/inbound/http_<feature>.go`
+2. Define response struct: `HttpView<Feature>Response`
+3. Create handler function returning `http.HandlerFunc`
+4. Use `templating.Engine` for rendering views
+5. Register route in `router.go` with middleware chain
 
-1. Define interface in `internal/domain/<context>/ports_outbound.go`.
-2. Implement adapter in `internal/adapters/outbound/<tool_name>.go`.
-3. Add constructor `New<ToolName>()` returning the interface type.
-4. Inject via domain service constructor.
-5. Add unit tests with mocks.
+### Adding a New Outbound Adapter (Repository)
+
+1. Create `internal/adapters/outbound/<name>_repository.go`
+2. Implement the port interface from the domain
+3. Prefer `resource.JsonFileAccess[K, V]` for file-based storage
+4. Return the port interface type (not the concrete type)
 
 ---
 
 ## 7. Using This Repo as a Template
 
-### Invariants (What Must Be Preserved)
+### What Must Be Preserved
 
-- Hexagonal architecture: domain → adapters → application layering.
-- Dependency rule: dependencies point inward only.
-- Port interface pattern in domain layer.
-- Constructor pattern: `New<Type>()` returning interface types.
-- Test naming convention and AAA (Arrange-Act-Assert) pattern.
-- Context propagation through all layers.
-- Benchmark-driven PGO workflow.
+| Element | Reason |
+|---------|--------|
+| Directory structure (`cmd/`, `internal/adapters/`, `internal/domain/`) | Enforces hexagonal architecture |
+| Port/adapter pattern | Maintains testability and flexibility |
+| Event-driven patterns | Enables loose coupling |
+| `cloud-native-utils` dependency | Provides cross-cutting utilities |
+| Testing conventions | Ensures consistent test quality |
+| PGO workflow | Maintains performance optimization capability |
 
-### Designed for Customization
+### What Should Be Customized
 
-- **Domain logic**: Replace or extend the `indexing` bounded context.
-- **Adapters**: Add database, HTTP, queue, or API adapters.
-- **Entry points**: Add CLIs, servers, workers under `cmd/`.
-- **Embedded assets**: Replace contents of `cmd/*/assets/`.
-- **Configuration**: Add environment variables or config files.
-- **Templates**: Customize UI in `assets/templates/`.
+| Element | Customization |
+|---------|---------------|
+| `internal/domain/indexing/` | Replace with your bounded contexts |
+| `cmd/cli/` and `cmd/server/` | Adapt entry points for your use case |
+| `.env.example` | Update environment variables for your app |
+| `APP_NAME`, `APP_SHORTNAME`, `APP_DESCRIPTION` | Your application identity |
+| Templates in `assets/templates/` | Your UI design |
+| Keycloak realm configuration | Your OIDC setup |
 
 ### Steps to Create a New Project
 
-1. Clone or copy this template repository.
-2. Update module name in `go.mod`.
-3. Rename `go-ddd-hex-starter` references throughout.
-4. Clear or replace the example `indexing` bounded context.
-5. Create your bounded contexts in `internal/domain/`.
-6. Implement inbound and outbound adapters in `internal/adapters/`.
-7. Wire adapters to domain services in `cmd/<app>/main.go`.
-8. Write tests following the established conventions.
-9. Run `just profile` to generate a PGO baseline.
-10. Build with `just build` for an optimized binary.
+1. **Clone/copy this template**
+   ```bash
+   git clone https://github.com/andygeiss/go-ddd-hex-starter my-project
+   cd my-project
+   rm -rf .git && git init
+   ```
+
+2. **Update project metadata**
+   - Rename module in `go.mod`
+   - Update `APP_NAME`, `APP_SHORTNAME`, `APP_DESCRIPTION` in `.env.example`
+   - Update `README.md` with your project description
+   - Update `LICENSE` if needed
+
+3. **Configure local development**
+   ```bash
+   cp .env.example .env
+   cp .keycloak.json.example .keycloak.json
+   ```
+
+4. **Replace example domain**
+   - Remove or rename `internal/domain/indexing/`
+   - Create your bounded contexts under `internal/domain/`
+   - Implement aggregates, entities, value objects, events, ports, and services
+
+5. **Implement adapters**
+   - Create inbound adapters for your entry points
+   - Create outbound adapters for your persistence and messaging needs
+
+6. **Wire dependencies**
+   - Update `cmd/*/main.go` to inject your services and adapters
+
+7. **Add tests and benchmarks**
+   - Write tests following naming conventions
+   - Add benchmarks in `cmd/*/main_test.go` for PGO
+
+8. **Run the stack**
+   ```bash
+   just up
+   ```
 
 ---
 
 ## 8. Key Commands & Workflows
 
-### Task Runner Commands (`just`)
-
 | Command | Description |
 |---------|-------------|
-| `just build` | Build optimized binary with PGO to `bin/` |
-| `just run` | Build and run the CLI application |
-| `just serve` | Run the HTTP server (development mode) |
-| `just test` | Run all unit tests with coverage |
-| `just profile` | Run benchmarks and generate PGO profile |
-| `just up` | Start Docker Compose dev stack (Keycloak, Kafka, app) |
-| `just down` | Stop Docker Compose services |
-| `just setup` | Install dependencies via Homebrew |
+| `just setup` | Install dependencies (docker-compose, just) via Homebrew |
+| `just build` or `just b` | Build Docker image with PGO optimization |
+| `just up` or `just u` | Generate secrets, build image, start all services |
+| `just down` or `just d` | Stop and remove all Docker Compose services |
+| `just test` or `just t` | Run all tests with coverage |
+| `just serve` | Run HTTP server locally (outside Docker) |
+| `just run` | Run CLI application locally |
+| `just profile` | Generate CPU profiles for PGO |
 
-### Manual Commands
+### Environment Selection
 
-```bash
-# Run all tests
-go test ./...
+- **Local development (without Docker):** Use `just serve` or `just run`; set `KAFKA_BROKERS=localhost:9092` in `.env`
+- **Containerized development:** Use `just up`; default `KAFKA_BROKERS=kafka:9092` works
 
-# Run with verbose output and coverage
-go test -v -coverprofile=coverage.pprof ./internal/...
+### Service URLs (after `just up`)
 
-# Run specific test
-go test -v -run Test_Index_Hash ./internal/domain/indexing/
-
-# Build without PGO
-go build -o ./bin/app ./cmd/cli/main.go
-
-# Build with PGO
-go build -ldflags "-s -w" -pgo cpuprofile.pprof -o ./bin/app ./cmd/cli/main.go
-
-# Run HTTP server
-PORT=8080 go run ./cmd/server/main.go
-```
-
-### Environment Variables
-
-| Variable | Purpose | Default |
-|----------|---------|---------|
-| `APP_NAME` | Application display name | — |
-| `APP_DESCRIPTION` | Application description | — |
-| `APP_SHORTNAME` | Short name for Docker image | — |
-| `PORT` | HTTP server port | `8080` |
-| `OIDC_CLIENT_ID` | OIDC client identifier | — |
-| `OIDC_CLIENT_SECRET` | OIDC client secret | — |
-| `OIDC_ISSUER` | OIDC issuer URL | — |
-| `OIDC_REDIRECT_URL` | OIDC callback URL | — |
+| Service | URL |
+|---------|-----|
+| Application | http://localhost:8080 |
+| Keycloak Admin | http://localhost:8180/admin (admin:admin) |
+| Kafka | localhost:9092 |
 
 ---
 
@@ -379,65 +432,61 @@ PORT=8080 go run ./cmd/server/main.go
 
 ### Security
 
-- OIDC credentials (`OIDC_CLIENT_SECRET`) must be kept secret; use environment variables or secret managers.
-- The `.keycloak.json` realm file is for local development only; generate unique secrets via `tools/change_me_local_secret.py` before use.
-- Security headers are applied via `WithSecurityHeaders` middleware.
+- **Never commit secrets:** `.env` and `.keycloak.json` are local-only files
+- **OIDC secrets:** Use `CHANGE_ME_LOCAL_SECRET` placeholder; `just up` rotates it automatically
+- **Production secrets:** Use a proper secret store (Vault, K8s Secrets)
+- **HTTP security headers:** Added via `WithSecurityHeaders` middleware
 
 ### Performance
 
-- Use Profile-Guided Optimization (PGO) for production builds: `just profile` then `just build`.
-- The `cpuprofile.pprof` file is generated from benchmarks and improves binary performance.
-- Avoid blocking operations in HTTP handlers; use context cancellation.
+- **PGO:** Run `just profile` to generate CPU profiles; `just build` uses them for optimization
+- **Benchmarks:** Critical paths have benchmarks in `cmd/*/main_test.go`
+- **Hot paths:** HTTP handlers, event processing, file I/O
 
 ### Platform Assumptions
 
-- Developed and tested on macOS; compatible with Linux.
-- Docker/Podman required for containerized workflows.
-- `just` task runner required for standardized commands.
-- Go 1.25+ required (uses `b.Loop()` in benchmarks).
+- **OS:** macOS or Linux (uses Homebrew for setup)
+- **Container runtime:** Podman for builds, Docker Compose for orchestration
+- **Go version:** 1.25+ (uses `b.Loop()` in benchmarks)
 
-### Do Not Modify
+### Deprecated/Experimental Areas
 
-- Do not import infrastructure packages in `internal/domain/`.
-- Do not break the hexagonal dependency rule.
-- Do not commit sensitive credentials to version control.
-- Generated files (`cpuprofile.pprof`, `coverage.pprof`, `bin/`) are typically gitignored.
+- None currently
 
-### Deprecated / Experimental
+### Do Not Touch
 
-- None currently documented.
+- `cloud-native-utils` integration patterns without reading `VENDOR.md`
+- Port interface definitions in domain packages (changes cascade to adapters)
 
 ---
 
 ## 10. How AI Tools and RAG Should Use This File
 
-### Consumption Instructions
+### Priority
 
-1. **Read `CONTEXT.md` first** before making any architectural changes or large refactors.
-2. Treat the rules and contracts in this file as **constraints** unless explicitly updated.
-3. Use `VENDOR.md` as the reference for `cloud-native-utils` library patterns.
-4. Use `README.md` for user-facing documentation and quick-start instructions.
+1. **Read this file first** before making architectural decisions or significant changes
+2. Consult `README.md` for human-facing documentation and feature descriptions
+3. Consult `VENDOR.md` for approved library usage patterns
 
-### Priority Order for Context
+### Constraints
 
-1. `CONTEXT.md` — Architecture, conventions, contracts.
-2. `VENDOR.md` — External library documentation.
-3. `README.md` — User-facing overview and commands.
-4. Source code — Implementation details.
+- Treat directory structure and layering rules as hard constraints
+- Prefer `cloud-native-utils` over custom implementations for cross-cutting concerns
+- Follow naming conventions exactly for consistency
+- Maintain port/adapter separation in all changes
 
-### Key Constraints for AI Agents
+### When Modifying the Codebase
 
-- Respect the hexagonal architecture: domain code must not import adapters.
-- Follow naming conventions exactly (test names, file names, constructor patterns).
-- Always pass `context.Context` as the first parameter.
-- Use `cloud-native-utils` patterns before implementing custom utilities.
-- Add tests for any new or changed code following the AAA pattern.
-- Maintain the dependency injection pattern via constructors.
+1. Identify which layer the change belongs to (domain, adapter, cmd)
+2. Respect the dependency direction: adapters depend on domain, never reverse
+3. Define interfaces (ports) in the domain; implement them in adapters
+4. Wire dependencies in entry points (`cmd/*/main.go`)
+5. Add tests following the naming convention
 
-### When Generating Code
+### Updating This File
 
-- Place new domain logic in `internal/domain/<context>/`.
-- Place new adapters in `internal/adapters/inbound/` or `outbound/`.
-- Wire new components in `cmd/<app>/main.go`.
-- Return interfaces from constructors, not concrete types.
-- Create corresponding `_test.go` files with proper test naming.
+If architectural patterns or conventions change:
+
+1. Update this file to reflect the new reality
+2. Ensure changes are consistent with `README.md` and `VENDOR.md`
+3. Test that the documented commands and workflows still work

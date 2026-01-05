@@ -62,7 +62,7 @@ profile:
 # Run - Execute CLI application locally
 # ======================================
 # Builds the image then runs the CLI binary from cmd/cli/main.go
-run: build
+run:
     @go run ./cmd/cli/main.go
 
 # ======================================

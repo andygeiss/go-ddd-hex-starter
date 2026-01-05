@@ -2,6 +2,8 @@ package indexing
 
 import (
 	"context"
+
+	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/event"
 )
 
 // The services in a domain context are responsible for managing the workflows.
@@ -20,13 +22,13 @@ import (
 // It is responsible for managing the index repository.
 // It creates aggregates.
 type IndexingService struct {
-	fileReader      FileReader      // inbound
-	indexRepository IndexRepository // outbound
-	publisher       EventPublisher  // outbound
+	fileReader      FileReader           // inbound
+	indexRepository IndexRepository      // outbound
+	publisher       event.EventPublisher // outbound
 }
 
 // NewIndexingService creates a new IndexingService instance.
-func NewIndexingService(fileReader FileReader, indexRepository IndexRepository, publisher EventPublisher) *IndexingService {
+func NewIndexingService(fileReader FileReader, indexRepository IndexRepository, publisher event.EventPublisher) *IndexingService {
 	return &IndexingService{
 		fileReader:      fileReader,
 		indexRepository: indexRepository,
@@ -59,7 +61,10 @@ func (a *IndexingService) CreateIndex(ctx context.Context, path string) error {
 	// Only services should be allowed to publish events via the event publisher,
 	// because each service handles a single use case and should be aware of if the event can be published or not.
 	// If there is a previous error than now event will be published.
-	evt := NewEventFileIndexCreated(id, len(files))
+	evt := NewEventFileIndexCreated().
+		WithIndexID(id).
+		WithFileCount(len(files))
+
 	if err := a.publisher.Publish(ctx, evt); err != nil {
 		return err
 	}
