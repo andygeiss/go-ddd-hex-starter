@@ -10,7 +10,6 @@
 
 # Test artifacts
 *.test
-testdata
 
 # Build artifacts
 bin
