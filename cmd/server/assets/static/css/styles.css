@@ -35,20 +35,31 @@ body::after {
 
 body::before {
     animation: blob-1 var(--blob-speed) ease-in-out infinite;
-    background: radial-gradient(circle, var(--accent-purple) 0%, var(--gradient-pink) 50%, transparent 70%);
+    background: radial-gradient(
+        circle,
+        var(--accent-purple) 0%,
+        var(--gradient-pink) 50%,
+        transparent 70%
+    );
     left: -10%;
     top: -10%;
 }
 
 body::after {
     animation: blob-2 var(--blob-speed) ease-in-out infinite;
-    background: radial-gradient(circle, var(--accent-blue) 0%, var(--accent-cyan) 50%, transparent 70%);
+    background: radial-gradient(
+        circle,
+        var(--accent-blue) 0%,
+        var(--accent-cyan) 50%,
+        transparent 70%
+    );
     bottom: -10%;
     right: -10%;
 }
 
 @keyframes blob-1 {
-    0%, 100% {
+    0%,
+    100% {
         transform: translate(0, 0) scale(1);
     }
     25% {
@@ -63,7 +74,8 @@ body::after {
 }
 
 @keyframes blob-2 {
-    0%, 100% {
+    0%,
+    100% {
         transform: translate(0, 0) scale(1);
     }
     25% {
@@ -197,7 +209,12 @@ main {
    ======================================== */
 
 h1 {
-    background: linear-gradient(135deg, var(--color-white) 0%, var(--accent-purple) 50%, var(--accent-pink) 100%);
+    background: linear-gradient(
+        135deg,
+        var(--color-white) 0%,
+        var(--accent-purple) 50%,
+        var(--accent-pink) 100%
+    );
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -292,7 +309,11 @@ p {
 }
 
 .btn-primary {
-    background: linear-gradient(135deg, var(--accent-purple) 0%, var(--accent-pink) 100%);
+    background: linear-gradient(
+        135deg,
+        var(--accent-purple) 0%,
+        var(--accent-pink) 100%
+    );
     border: none;
     color: var(--color-white);
 }
@@ -302,7 +323,11 @@ p {
 }
 
 .btn-secondary {
-    background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-blue) 100%);
+    background: linear-gradient(
+        135deg,
+        var(--accent-cyan) 0%,
+        var(--accent-blue) 100%
+    );
     border: none;
     color: var(--color-white);
 }
@@ -345,7 +370,9 @@ p {
 
 .form-input:focus {
     border-color: var(--accent-purple);
-    box-shadow: var(--glass-shadow-sm), 0 0 20px rgba(168, 85, 247, 0.3);
+    box-shadow:
+        var(--glass-shadow-sm),
+        0 0 20px rgba(168, 85, 247, 0.3);
     outline: none;
 }
 
@@ -539,7 +566,8 @@ table {
     width: 100%;
 }
 
-th, td {
+th,
+td {
     padding: var(--space-3) var(--space-4);
     text-align: left;
 }

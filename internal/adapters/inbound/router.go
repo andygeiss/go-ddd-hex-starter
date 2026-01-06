@@ -47,5 +47,13 @@ func Route(ctx context.Context, efs fs.FS, logger *slog.Logger) *http.ServeMux {
 	// This endpoint is used to forward the user to the login page of the OIDC provider.
 	mux.HandleFunc("GET /ui/login", logging.WithLogging(logger, HttpViewLogin(e)))
 
+	// Add the manifest endpoint for the PWA.
+	// This endpoint serves the manifest.json file for Progressive Web App support.
+	mux.HandleFunc("GET /manifest.json", logging.WithLogging(logger, HttpViewManifest(e)))
+
+	// Add the service worker endpoint for the PWA.
+	// This endpoint serves the sw.js file for offline caching and installability.
+	mux.HandleFunc("GET /sw.js", logging.WithLogging(logger, HttpViewServiceWorker(e)))
+
 	return mux
 }

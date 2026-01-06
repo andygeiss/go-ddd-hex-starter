@@ -56,6 +56,7 @@ The template includes two bounded contexts (`agent` and `indexing`), an HTTP ser
 - **OIDC Authentication** — Keycloak integration with session management
 - **Event Streaming** — Kafka-based pub/sub for domain events
 - **LLM Agent Loop** — Observe → decide → act → update pattern with LM Studio
+- **Progressive Web App** — Service worker, manifest, and offline support for installable web apps
 - **Production-Ready Docker** — Multi-stage build with PGO optimization (~5-10MB images)
 - **Developer Experience** — `just` task runner, golangci-lint, comprehensive test coverage
 
@@ -235,8 +236,9 @@ Configuration is managed via environment variables. Copy `.env.example` to `.env
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `APP_NAME` | Display name for UI | `Template` |
+| `APP_NAME` | Display name for UI and PWA | `Template` |
 | `APP_SHORTNAME` | Docker image/container name | `template` |
+| `APP_VERSION` | Version for PWA cache busting | `1.0.0` |
 | `PORT` | HTTP server port | `8080` |
 | `KAFKA_BROKERS` | Kafka broker addresses | `localhost:9092` |
 | `OIDC_ISSUER` | Keycloak realm URL | `http://localhost:8180/realms/local` |
@@ -269,7 +271,7 @@ See `.env.example` for the complete list with documentation.
 3. **Configure project identity:**
    ```bash
    cp .env.example .env
-   # Edit APP_NAME, APP_SHORTNAME, APP_DESCRIPTION
+   # Edit APP_NAME, APP_SHORTNAME, APP_DESCRIPTION, APP_VERSION
    ```
 
 4. **Add your domain logic:**

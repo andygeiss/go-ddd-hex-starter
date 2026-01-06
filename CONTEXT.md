@@ -32,6 +32,7 @@ The template includes two bounded contexts (`agent` and `indexing`), an HTTP ser
 | Linting | `golangci-lint` |
 | CI | GitHub Actions |
 | Profiling | PGO (Profile-Guided Optimization) |
+| PWA | Service Worker, Web App Manifest |
 
 ---
 
@@ -98,12 +99,21 @@ go-ddd-hex-starter/
 │       └── assets/               # Embedded static files & templates
 │           ├── static/           # CSS, JS, images (served at /static)
 │           └── templates/        # Go templates (*.tmpl)
+│               ├── index.tmpl    # Main authenticated view
+│               ├── login.tmpl    # Login page
+│               ├── manifest.tmpl # PWA web app manifest
+│               └── sw.tmpl       # PWA service worker
 │
 ├── internal/                     # Private application code
 │   ├── adapters/                 # Hexagonal adapters
 │   │   ├── inbound/              # Driving adapters (HTTP, filesystem, events)
 │   │   │   ├── router.go         # HTTP route definitions
 │   │   │   ├── http_*.go         # HTTP handlers
+│   │   │   │   ├── http_index.go        # Authenticated index view
+│   │   │   │   ├── http_login.go        # Login view
+│   │   │   │   ├── http_manifest.go     # PWA manifest.json endpoint
+│   │   │   │   ├── http_service_worker.go # PWA service worker endpoint
+│   │   │   │   └── http_view.go         # Generic template view handler
 │   │   │   ├── file_reader.go    # Filesystem adapter
 │   │   │   ├── event_subscriber.go
 │   │   │   ├── middleware.go
@@ -279,7 +289,7 @@ The primary external dependency. Use its utilities instead of rolling custom imp
 - Environment variables (see `.env.example`)
 - Loaded via `dotenv-load` in `.justfile`
 - Docker Compose uses `--env-file .env`
-- Key variables: `PORT`, `KAFKA_BROKERS`, `OIDC_*`, `LM_STUDIO_*`
+- Key variables: `PORT`, `KAFKA_BROKERS`, `OIDC_*`, `LM_STUDIO_*`, `APP_VERSION`
 
 ### Dependency Injection
 
@@ -293,6 +303,14 @@ The primary external dependency. Use its utilities instead of rolling custom imp
 - Events serialized to JSON for Kafka
 - Builder pattern: `NewEventTaskStarted().WithAgentID(id).WithTaskID(taskID)`
 - Topics follow pattern: `{bounded_context}.{event_name}`
+
+### Progressive Web App (PWA)
+
+- **Manifest:** `/manifest.json` served by `HttpViewManifest` (uses `APP_NAME` env var)
+- **Service Worker:** `/sw.js` served by `HttpViewServiceWorker` (uses `APP_NAME`, `APP_VERSION` env vars)
+- **Cache Strategy:** Service worker uses versioned cache (`{APP_NAME}-v{APP_VERSION}`) for offline support
+- **Installability:** Meta tags in templates enable "Add to Home Screen" on mobile devices
+- **Environment Variables:** Handlers read env vars at startup (not per-request) for efficiency
 
 ### HTTP/API Patterns
 
@@ -321,8 +339,9 @@ The primary external dependency. Use its utilities instead of rolling custom imp
 - Add new entry points under `cmd/`
 - Add new adapters under `internal/adapters/{inbound,outbound}/`
 - Modify `.env.example` for project-specific configuration
-- Update `APP_NAME`, `APP_SHORTNAME`, `APP_DESCRIPTION` in `.env`
+- Update `APP_NAME`, `APP_SHORTNAME`, `APP_DESCRIPTION`, `APP_VERSION` in `.env`
 - Replace/extend `assets/` with project-specific static files and templates
+- Customize PWA icons by replacing files in `assets/static/img/`
 
 ### Steps to Create a New Project
 

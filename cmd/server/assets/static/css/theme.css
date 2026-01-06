@@ -6,20 +6,20 @@
 
 :root {
     /* ===== GLASSMORPHISM PALETTE - Apple Dark ===== */
-    
+
     /* Glass Background Colors (with transparency) */
     --glass-bg: rgba(255, 255, 255, 0.08);
     --glass-bg-solid: rgba(255, 255, 255, 0.12);
     --glass-bg-dark: rgba(0, 0, 0, 0.2);
     --glass-border: rgba(255, 255, 255, 0.18);
     --glass-border-light: rgba(255, 255, 255, 0.3);
-    
+
     /* Blur Values */
     --glass-blur: 20px;
     --glass-blur-sm: 10px;
     --glass-blur-lg: 30px;
     --glass-blur-xl: 50px;
-    
+
     /* Apple Gradient Colors */
     --gradient-purple: #bf5af2;
     --gradient-pink: #ff375f;
@@ -29,7 +29,7 @@
     --gradient-yellow: #ffd60a;
     --gradient-green: #30d158;
     --gradient-teal: #64d2ff;
-    
+
     /* Apple Accent Colors */
     --accent-purple: #bf5af2;
     --accent-pink: #ff375f;
@@ -37,7 +37,7 @@
     --accent-cyan: #64d2ff;
     --accent-green: #30d158;
     --accent-orange: #ff9f0a;
-    
+
     /* Apple Gray Scale */
     --color-white: #ffffff;
     --color-black: #000000;
@@ -51,9 +51,14 @@
     --color-gray-700: #3a3a3c;
     --color-gray-800: #2c2c2e;
     --color-gray-900: #1c1c1e;
-    
+
     /* Semantic Color Mapping */
-    --color-background: linear-gradient(160deg, #1c1c1e 0%, #2c2c2e 50%, #1c1c1e 100%);
+    --color-background: linear-gradient(
+        160deg,
+        #1c1c1e 0%,
+        #2c2c2e 50%,
+        #1c1c1e 100%
+    );
     --color-background-solid: #000000;
     --color-border: var(--glass-border);
     --color-error: #ff453a;
@@ -78,11 +83,11 @@
     --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.25);
     --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
     --glass-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
-    
+
     /* Blob Animation */
     --blob-size: 500px;
     --blob-speed: 25s;
-    
+
     /* Layout */
     --header-height: 64px;
     --nav-width: 280px;
@@ -92,8 +97,7 @@
     --font-family:
         "Inter", "SF Pro Display", -apple-system, BlinkMacSystemFont,
         "Segoe UI", Roboto, sans-serif;
-    --font-family-mono:
-        "JetBrains Mono", "Fira Code", "SF Mono", monospace;
+    --font-family-mono: "JetBrains Mono", "Fira Code", "SF Mono", monospace;
     --font-size-xs: 0.75rem;
     --font-size-sm: 0.875rem;
     --font-size-base: 1rem;
@@ -167,14 +171,19 @@
         --glass-bg-dark: rgba(0, 0, 0, 0.3);
         --glass-border: rgba(255, 255, 255, 0.2);
         --glass-border-light: rgba(255, 255, 255, 0.3);
-        
-        --color-background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+
+        --color-background: linear-gradient(
+            135deg,
+            #1a1a2e 0%,
+            #16213e 50%,
+            #0f3460 100%
+        );
         --color-background-solid: #0f0f1a;
         --color-surface: rgba(255, 255, 255, 0.08);
         --color-surface-solid: rgba(255, 255, 255, 0.12);
         --color-text: rgba(255, 255, 255, 0.95);
         --color-text-muted: rgba(255, 255, 255, 0.6);
-        
+
         --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
         --glass-shadow-sm: 0 4px 16px rgba(0, 0, 0, 0.3);
         --glass-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.6);
