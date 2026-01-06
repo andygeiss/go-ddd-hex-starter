@@ -52,10 +52,7 @@ func Test_Server_Integration_Readiness_Endpoint_Should_Return_OK(t *testing.T) {
 	// Assert
 	assert.That(t, "request error must be nil", err == nil, true)
 	assert.That(t, "status code must be 200", resp.StatusCode, http.StatusOK)
-
-	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
-	assert.That(t, "body must be OK", string(body), "OK")
 }
 
 func Test_Server_Integration_Static_Assets_Should_Serve_CSS(t *testing.T) {

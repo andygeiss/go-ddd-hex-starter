@@ -9,13 +9,138 @@ import (
 
 	"github.com/andygeiss/cloud-native-utils/assert"
 	"github.com/andygeiss/cloud-native-utils/messaging"
+	"github.com/andygeiss/cloud-native-utils/resource"
 	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
 	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/event"
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/indexing"
 )
 
+// ============================================================================
+// Unit Tests (no external dependencies)
+// ============================================================================
+// These tests use mocks and can run without any external services.
+
+func Test_CLI_Unit_IndexingService_CreateIndex_With_Mock_Should_Succeed(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	mockFileReader := &mockFileReader{
+		fileInfos: []indexing.FileInfo{
+			{AbsPath: "/test/file1.txt", Size: 100},
+			{AbsPath: "/test/file2.txt", Size: 200},
+		},
+	}
+	mockIndexRepository := resource.NewMockAccess[indexing.IndexID, indexing.Index]()
+	mockIndexRepository.WithCreateFn(func(ctx context.Context, id indexing.IndexID, index indexing.Index) error {
+		return nil
+	})
+	mockEventPublisher := &mockEventPublisher{}
+
+	indexingService := indexing.NewIndexingService(mockFileReader, mockIndexRepository, mockEventPublisher)
+
+	// Act
+	err := indexingService.CreateIndex(ctx, "/test/path")
+
+	// Assert
+	assert.That(t, "create index error must be nil", err == nil, true)
+	assert.That(t, "event must be published", mockEventPublisher.Published, true)
+}
+
+func Test_CLI_Unit_IndexingService_IndexFiles_With_Mock_Should_Return_Files(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	expectedFiles := []indexing.FileInfo{
+		{AbsPath: "/test/file1.txt", Size: 100},
+		{AbsPath: "/test/file2.txt", Size: 200},
+		{AbsPath: "/test/file3.txt", Size: 300},
+	}
+	mockFileReader := &mockFileReader{fileInfos: expectedFiles}
+	mockIndexRepository := resource.NewMockAccess[indexing.IndexID, indexing.Index]()
+	mockIndexRepository.WithCreateFn(func(ctx context.Context, id indexing.IndexID, index indexing.Index) error {
+		return nil
+	})
+	mockEventPublisher := &mockEventPublisher{}
+
+	indexingService := indexing.NewIndexingService(mockFileReader, mockIndexRepository, mockEventPublisher)
+
+	// First create the index
+	_ = indexingService.CreateIndex(ctx, "/test/path")
+
+	// Act
+	files, err := indexingService.IndexFiles(ctx, "/test/path")
+
+	// Assert
+	assert.That(t, "index files error must be nil", err == nil, true)
+	assert.That(t, "files count must match", len(files), len(expectedFiles))
+}
+
+func Test_CLI_Unit_FileReader_ReadFileInfos_With_TestData_Should_Return_Files(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	_ = os.MkdirAll("testdata_cli", 0755)
+	defer func() { _ = os.RemoveAll("testdata_cli") }()
+
+	// Create test files
+	for i := range 3 {
+		f, _ := os.Create("testdata_cli/file" + string(rune('a'+i)) + ".txt")
+		_, _ = f.WriteString("test content")
+		_ = f.Close()
+	}
+
+	fileReader := inbound.NewFileReader()
+
+	// Act
+	fileInfos, err := fileReader.ReadFileInfos(ctx, "testdata_cli")
+
+	// Assert
+	assert.That(t, "error must be nil", err == nil, true)
+	assert.That(t, "must return 3 files", len(fileInfos), 3)
+}
+
+func Test_CLI_Unit_FileIndexRepository_Create_And_Read_Should_Work(t *testing.T) {
+	// Arrange
+	ctx := context.Background()
+	indexPath := "./test_cli_index.json"
+	defer func() { _ = os.Remove(indexPath) }()
+
+	repository := outbound.NewFileIndexRepository(indexPath)
+	id := indexing.IndexID("/test/path")
+	fileInfos := []indexing.FileInfo{
+		{AbsPath: "/test/file1.txt", Size: 100},
+	}
+	index := indexing.NewIndex(id, fileInfos)
+
+	// Act
+	createErr := repository.Create(ctx, id, index)
+	readIndex, readErr := repository.Read(ctx, id)
+
+	// Assert
+	assert.That(t, "create error must be nil", createErr == nil, true)
+	assert.That(t, "read error must be nil", readErr == nil, true)
+	assert.That(t, "file count must match", len(readIndex.FileInfos), 1)
+}
+
+// Mock implementations for unit tests.
+type mockFileReader struct {
+	fileInfos []indexing.FileInfo
+}
+
+func (m *mockFileReader) ReadFileInfos(ctx context.Context, path string) ([]indexing.FileInfo, error) {
+	return m.fileInfos, nil
+}
+
+type mockEventPublisher struct {
+	Published bool
+}
+
+func (m *mockEventPublisher) Publish(ctx context.Context, e event.Event) error {
+	m.Published = true
+	return nil
+}
+
+// ============================================================================
 // Integration tests for the CLI application with external Kafka dispatcher.
+// ============================================================================
 // These tests require a running Kafka instance (KAFKA_BROKERS environment variable).
 //
 // Run with: KAFKA_BROKERS=localhost:9092 go test -v ./cmd/cli/...

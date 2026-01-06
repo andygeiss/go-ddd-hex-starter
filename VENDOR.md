@@ -14,18 +14,18 @@ This document describes the external vendor libraries used in this project and p
 
 - **Purpose:** Core utility library providing modular, cloud-native building blocks for Go applications. This is the primary vendor dependency and should be the first choice for cross-cutting concerns.
 - **Repository:** [github.com/andygeiss/cloud-native-utils](https://github.com/andygeiss/cloud-native-utils)
-- **Version:** v0.4.8
+- **Version:** v0.4.9
 - **Documentation:** [pkg.go.dev](https://pkg.go.dev/github.com/andygeiss/cloud-native-utils)
 
 #### Key Packages
 
 | Package | Purpose | Used In This Project |
 |---------|---------|---------------------|
-| `assert` | Test assertions (`assert.That`) | `internal/domain/*_test.go`, `cmd/*_test.go` |
+| `assert` | Test assertions (`assert.That`) | `internal/domain/*_test.go`, `internal/adapters/*_test.go`, `cmd/*_test.go` |
 | `logging` | Structured JSON logging | `cmd/server/main.go` via `logging.NewJsonLogger()` |
-| `messaging` | Pub/sub dispatcher (in-memory or Kafka) | `cmd/cli/main.go`, `internal/adapters/outbound/event_publisher.go` |
+| `messaging` | Pub/sub dispatcher (in-memory or Kafka) | `cmd/cli/main.go`, `internal/adapters/outbound/event_publisher.go`, tests |
 | `redirecting` | HTMX-compatible redirects | `internal/adapters/inbound/http_index.go` |
-| `resource` | Generic CRUD interface with backends | `internal/adapters/outbound/file_index_repository.go` |
+| `resource` | Generic CRUD interface with backends | `internal/adapters/outbound/file_index_repository.go`, tests |
 | `security` | OIDC, encryption, HTTP server | `cmd/server/main.go`, `internal/adapters/inbound/router.go` |
 | `service` | Context helpers, lifecycle hooks | `cmd/server/main.go`, `cmd/cli/main.go` |
 | `templating` | HTML template engine with `embed.FS` | `internal/adapters/inbound/router.go`, `http_view.go` |
@@ -38,6 +38,7 @@ This document describes the external vendor libraries used in this project and p
 | **Structured logging** | `logging` | `logging.NewJsonLogger()` at startup, pass to handlers |
 | **HTTP request logging** | `logging` | `logging.WithLogging(logger, handler)` middleware |
 | **Event publishing/subscribing** | `messaging` | `messaging.NewExternalDispatcher()` for Kafka |
+| **In-memory messaging (tests)** | `messaging` | `messaging.NewInternalDispatcher()` for unit tests |
 | **HTTP redirects** | `redirecting` | `redirecting.Redirect(w, r, "/path")` |
 | **CRUD repositories** | `resource` | `resource.NewJsonFileAccess[K, V](filename)` |
 | **Mock repositories** | `resource` | `resource.NewMockAccess[K, V]()` for tests |
@@ -150,6 +151,43 @@ The only case to use directly is for advanced Kafka features (consumer groups, p
 
 ---
 
+## Python Standard Library (Tooling)
+
+Python scripts in `tools/` use only the standard library to avoid external dependencies.
+
+### Modules Used
+
+| Module | Purpose | Used In |
+|--------|---------|--------|
+| `unittest` | Test framework | `tools/*_test.py` |
+| `subprocess` | Run shell commands | `tools/create_pgo.py` |
+| `glob` | File pattern matching | `tools/create_pgo.py` |
+| `secrets` | Cryptographic random | `tools/change_me_local_secret.py` |
+| `pathlib` | Path manipulation | `tools/*.py` |
+| `shutil` | File operations | `tools/create_pgo.py` |
+| `tempfile` | Temporary files | `tools/*_test.py` |
+| `unittest.mock` | Test mocking | `tools/*_test.py` |
+
+### When to Use
+
+| Concern | Module | Pattern |
+|---------|--------|---------|
+| **Unit testing** | `unittest` | `class TestX(unittest.TestCase)` |
+| **Assertions** | `unittest` | `self.assertEqual(actual, expected)` |
+| **Mocking** | `unittest.mock` | `@patch('module.function')` |
+| **Secure random** | `secrets` | `secrets.choice(alphabet)` |
+| **Run commands** | `subprocess` | `subprocess.run(cmd, check=True)` |
+| **File patterns** | `glob` | `glob.glob('*.pprof')` |
+
+### Why No External Dependencies
+
+- **Simplicity:** No `pip install` required for development
+- **Portability:** Works on any system with Python 3
+- **Stability:** Standard library is stable and well-documented
+- **CI/CD:** No additional setup steps in pipelines
+
+---
+
 ## Cross-cutting Concerns and Recommended Patterns
 
 ### Testing
@@ -157,7 +195,8 @@ The only case to use directly is for advanced Kafka features (consumer groups, p
 | Concern | Vendor | Pattern |
 |---------|--------|---------|
 | Assertions | `cloud-native-utils/assert` | `assert.That(t, msg, actual, expected)` |
-| Mock repositories | `cloud-native-utils/resource` | `resource.NewMockAccess[K, V]()` |
+| Mock repositories | `cloud-native-utils/resource` | `resource.NewMockAccess[K, V]().WithCreateFn(...)` |
+| In-memory messaging | `cloud-native-utils/messaging` | `messaging.NewInternalDispatcher()` |
 | Mock functions | Standard library | Create interface + mock struct |
 
 ### Logging

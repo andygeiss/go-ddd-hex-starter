@@ -94,7 +94,9 @@ For detailed architectural documentation, see [CONTEXT.md](CONTEXT.md).
 go-ddd-hex-starter/
 ├── cmd/
 │   ├── cli/                  # CLI demo application
+│   │   └── main_test.go      # CLI unit and integration tests
 │   └── server/               # HTTP server with OIDC auth
+│       ├── main_test.go      # Server integration tests
 │       └── assets/           # Embedded templates and static files
 ├── internal/
 │   ├── adapters/
@@ -102,8 +104,11 @@ go-ddd-hex-starter/
 │   │   └── outbound/         # Repositories, event publishers
 │   └── domain/
 │       ├── event/            # Event interfaces
-│       └── indexing/         # Example bounded context
-├── tools/                    # Development utilities
+│       └── indexing/         # Example bounded context (with tests)
+├── tools/                    # Python development utilities
+│   ├── *_test.py             # Python unit tests
+│   ├── change_me_local_secret.py
+│   └── create_pgo.py
 ├── .justfile                 # Command runner recipes
 ├── docker-compose.yml        # Local development stack
 └── Dockerfile                # Production container build
@@ -114,9 +119,11 @@ go-ddd-hex-starter/
 ## Prerequisites
 
 - **Go 1.25+**
+- **Python 3** (for development tooling)
 - **Docker** or **Podman** (for container builds)
 - **Docker Compose** (for local development stack)
 - **just** (command runner) — install via `brew install just`
+- **golangci-lint** (for code quality) — install via `brew install golangci-lint`
 
 ---
 
@@ -177,7 +184,7 @@ Default Keycloak credentials: `admin` / `admin`
 | `just down` | `just d` | Stop all services |
 | `just fmt` | — | Format Go code with golangci-lint |
 | `just lint` | — | Run golangci-lint checks |
-| `just test` | `just t` | Run tests with coverage |
+| `just test` | `just t` | Run Go + Python tests with coverage |
 | `just serve` | — | Run HTTP server locally |
 | `just run` | — | Run CLI demo locally |
 | `just profile` | — | Generate PGO profiles |
@@ -200,22 +207,39 @@ just run
 
 ## Testing
 
-Run all tests with coverage:
+Run all tests (Go + Python) with coverage:
 
 ```bash
 just test
 ```
 
-Or use Go directly:
+This runs:
+- Go unit tests with coverage (~65% coverage target)
+- Python unit tests for development tools
+
+Or run tests separately:
 
 ```bash
+# Go tests only
 go test -v ./internal/...
+
+# Python tests only
+cd tools && python3 -m unittest -v
 ```
 
 Tests follow the naming convention:
 ```
 Test_<Struct>_<Method>_With_<Condition>_Should_<Result>
 ```
+
+### Test Coverage
+
+| Package | Coverage |
+|---------|----------|
+| `internal/domain/indexing` | ~87% |
+| `internal/adapters/inbound` | ~54% |
+| `internal/adapters/outbound` | ~67% |
+| **Total** | **~65%** |
 
 ---
 

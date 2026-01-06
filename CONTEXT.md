@@ -12,14 +12,16 @@ The template includes a working example domain (`indexing`) that demonstrates fi
 
 | Category | Technology |
 |----------|------------|
-| **Language** | Go 1.25+ (module: `github.com/andygeiss/go-ddd-hex-starter`) |
-| **Core Library** | `github.com/andygeiss/cloud-native-utils` (logging, security, messaging, templating, resource access) |
+| **Language** | Go 1.25.5 (module: `github.com/andygeiss/go-ddd-hex-starter`) |
+| **Core Library** | `github.com/andygeiss/cloud-native-utils` v0.4.9 (logging, security, messaging, templating, resource access) |
 | **Authentication** | OpenID Connect via Keycloak (`github.com/coreos/go-oidc/v3`) |
 | **Messaging** | Apache Kafka (`github.com/segmentio/kafka-go`) |
 | **Frontend** | Server-side Go templates with HTMX, vanilla CSS |
 | **Build System** | `just` (command runner), Podman/Docker |
 | **Containerization** | Multi-stage Dockerfile (scratch-based runtime) |
 | **Orchestration** | Docker Compose (Keycloak, Kafka, app) |
+| **Testing** | Go `testing` package, Python `unittest` for tooling |
+| **Linting** | `golangci-lint` for Go code quality |
 
 ---
 
@@ -77,9 +79,11 @@ go-ddd-hex-starter/
 ├── cmd/                          # Application entry points
 │   ├── cli/                      # CLI demonstration application
 │   │   ├── main.go               # CLI entry point with event-driven demo
+│   │   ├── main_test.go          # CLI unit and integration tests
 │   │   └── assets/               # Embedded CLI assets
 │   └── server/                   # HTTP server application
 │       ├── main.go               # Server entry point with OIDC auth
+│       ├── main_test.go          # Server integration tests and benchmarks
 │       └── assets/               # Embedded server assets
 │           ├── static/           # CSS, JS (HTMX), images
 │           └── templates/        # Go HTML templates (*.tmpl)
@@ -89,29 +93,42 @@ go-ddd-hex-starter/
 │   │   │   ├── router.go         # HTTP route definitions
 │   │   │   ├── http_*.go         # HTTP handlers
 │   │   │   ├── middleware.go     # HTTP middleware
+│   │   │   ├── middleware_test.go # Middleware tests
 │   │   │   ├── event_subscriber.go # Kafka event subscription
-│   │   │   └── file_reader.go    # Filesystem adapter
+│   │   │   ├── event_subscriber_test.go # Subscriber tests
+│   │   │   ├── file_reader.go    # Filesystem adapter
+│   │   │   └── file_reader_test.go # File reader tests
 │   │   └── outbound/             # Driven adapters (persistence, messaging)
 │   │       ├── event_publisher.go    # Kafka event publishing
-│   │       └── file_index_repository.go # JSON file persistence
+│   │       ├── event_publisher_test.go # Publisher tests
+│   │       ├── file_index_repository.go # JSON file persistence
+│   │       └── file_index_repository_test.go # Repository tests
 │   └── domain/                   # Domain layer (pure business logic)
 │       ├── event/                # Event infrastructure interfaces
 │       │   ├── event.go          # Event interface
+│       │   ├── event_test.go     # Event interface tests
 │       │   ├── event_publisher.go
 │       │   ├── event_subscriber.go
 │       │   ├── event_factory.go
 │       │   └── event_handler.go
 │       └── indexing/             # Example bounded context
 │           ├── aggregate.go      # Aggregate root
+│           ├── aggregate_test.go # Aggregate tests
 │           ├── entities.go       # Domain entities
+│           ├── entities_test.go  # Entity tests
 │           ├── value_objects.go  # Value objects
+│           ├── value_objects_test.go # Value object tests
 │           ├── events.go         # Domain events
+│           ├── events_test.go    # Domain event tests
 │           ├── ports_inbound.go  # Inbound port interfaces
 │           ├── ports_outbound.go # Outbound port interfaces
-│           └── service.go        # Application service
-├── tools/                        # Development/build utilities
+│           ├── service.go        # Application service
+│           └── service_test.go   # Service tests
+├── tools/                        # Development/build utilities (Python)
 │   ├── change_me_local_secret.py # Secret rotation for local dev
-│   └── create_pgo.py             # Profile-Guided Optimization script
+│   ├── change_me_local_secret_test.py # Unit tests for secret rotation
+│   ├── create_pgo.py             # Profile-Guided Optimization script
+│   └── create_pgo_test.py        # Unit tests for PGO script
 ├── bin/                          # Compiled binaries (gitignored)
 ├── .justfile                     # Command runner recipes
 ├── .env.example                  # Environment template (commit this)
@@ -128,7 +145,9 @@ go-ddd-hex-starter/
 | **Inbound adapters** (HTTP handlers, subscribers, readers) | `internal/adapters/inbound/` |
 | **Outbound adapters** (repositories, publishers, external APIs) | `internal/adapters/outbound/` |
 | **Domain event interfaces** | `internal/domain/event/` (shared across contexts) |
-| **Unit tests for domain** | `internal/domain/<context>/*_test.go` (same package or `_test` suffix) |
+| **Unit tests for domain** | `internal/domain/<context>/*_test.go` (same package) |
+| **Unit tests for adapters** | `internal/adapters/<direction>/*_test.go` (same package) |
+| **Unit tests for tools** | `tools/*_test.py` (Python unittest) |
 | **Integration tests** | `cmd/<app>/*_test.go` |
 | **HTTP routes** | Register in `internal/adapters/inbound/router.go` |
 | **Static assets** | `cmd/server/assets/static/` (embedded via `//go:embed`) |
@@ -178,15 +197,18 @@ go-ddd-hex-starter/
 ### 5.4 Testing
 
 - **Framework:** Standard `testing` package with `cloud-native-utils/assert` for assertions
+- **Python tests:** Standard `unittest` module for `tools/` scripts (no external dependencies)
 - **Pattern:** Arrange-Act-Assert (AAA)
 - **Naming:** `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>`
-- **Test files:** Same directory as production code, `*_test.go` suffix
-- **Package:** Use `<package>_test` for black-box testing of exported API
+- **Test files:** Same directory as production code, `*_test.go` suffix (or `*_test.py` for Python)
+- **Package:** Use same package for white-box testing of internal implementation
 - **Mocking:**
   - Create mock structs implementing domain interfaces
   - Use `cloud-native-utils/resource.NewMockAccess` for repository mocks
+  - Use `cloud-native-utils/messaging.NewInternalDispatcher` for in-memory messaging
 - **Integration tests:** Located in `cmd/<app>/*_test.go`, use `httptest.NewServer`
-- **Coverage:** Run with `just test`, generates `coverage.pprof`
+- **Coverage:** Run with `just test`, generates `coverage.pprof` (Go) and runs Python tests
+- **Test coverage:** Target ~65% coverage; domain layer should have higher coverage
 
 ### 5.5 Formatting & Linting
 
@@ -305,13 +327,13 @@ All commands are defined in `.justfile` and executed via `just`:
 
 | Command | Description |
 |---------|-------------|
-| `just setup` | Install dependencies (docker-compose, just) via Homebrew |
+| `just setup` | Install dependencies (docker-compose, golangci-lint, just, podman) via Homebrew |
 | `just build` (or `just b`) | Build Docker image using Podman |
 | `just up` (or `just u`) | Generate secrets, build image, start all services |
 | `just down` (or `just d`) | Stop and remove all containers |
 | `just fmt` | Format Go code with golangci-lint formatters |
 | `just lint` | Run golangci-lint to check code quality (0 issues required) |
-| `just test` (or `just t`) | Run unit tests with coverage |
+| `just test` (or `just t`) | Run Go unit tests with coverage + Python tests for tools |
 | `just serve` | Run HTTP server locally (requires Kafka/Keycloak) |
 | `just run` | Run CLI demo locally |
 | `just profile` | Generate PGO profiles via benchmarks |
@@ -322,12 +344,18 @@ All commands are defined in `.justfile` and executed via `just`:
 # Run tests with verbose output
 go test -v ./internal/...
 
+# Run tests including cmd/ (integration tests)
+go test -v ./...
+
 # Build binaries locally
 go build -o bin/server ./cmd/server
 go build -o bin/cli ./cmd/cli
 
 # Run specific benchmarks
 go test -bench=. -benchtime=5s ./internal/...
+
+# Run Python tests manually
+cd tools && python3 -m unittest -v
 ```
 
 ### Service URLs (when running `just up`)
@@ -355,6 +383,7 @@ go test -bench=. -benchtime=5s ./internal/...
 - **Homebrew:** Used for dependency installation (`just setup`)
 - **Docker/Podman:** Required for containerized deployment
 - **Go 1.25+:** Uses modern Go features and toolchain
+- **Python 3:** Required for tooling scripts (secret rotation, PGO profiling)
 
 ### Build & Performance
 
@@ -374,6 +403,7 @@ go test -bench=. -benchtime=5s ./internal/...
 - `bin/` directory is gitignored and auto-generated
 - Profiling artifacts (`*.pprof`, `*.svg`) are generated and gitignored
 - `coverage.pprof` is test output; do not commit
+- Test index files (`test_*.json`) are temporary test artifacts
 
 ---
 
@@ -391,9 +421,11 @@ go test -bench=. -benchtime=5s ./internal/...
 2. **New code:** Follow directory placement rules and naming conventions exactly
 3. **New bounded context:** Use `internal/domain/indexing/` as the reference implementation
 4. **Testing:** Create tests following the `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>` pattern
-5. **Configuration:** Add new environment variables to `.env.example` with documentation
-6. **Events:** Define event structs in domain, serialize in adapters
-7. **Dependencies:** Prefer `cloud-native-utils` patterns; document new external libraries
+6. **Test coverage:** Ensure new code has accompanying tests; aim for ~65% overall coverage
+7. **Configuration:** Add new environment variables to `.env.example` with documentation
+8. **Events:** Define event structs in domain, serialize in adapters
+9. **Dependencies:** Prefer `cloud-native-utils` patterns; document new external libraries
+10. **Python tooling:** Add tests in `tools/*_test.py` using `unittest` module
 
 ### When Updating This File
 
