@@ -22,43 +22,42 @@ A production-ready Go starter template demonstrating Domain-Driven Design (DDD) 
 ## Table of Contents
 
 - [Overview](#overview)
-- [Features](#features)
+- [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Project Structure](#project-structure)
-- [Prerequisites](#prerequisites)
 - [Getting Started](#getting-started)
 - [Usage](#usage)
 - [Testing](#testing)
 - [Configuration](#configuration)
 - [Using as a Template](#using-as-a-template)
-- [Common Pitfalls](#common-pitfalls)
+- [Contributing](#contributing)
 - [License](#license)
 
 ---
 
 ## Overview
 
-This template provides a clean foundation for building cloud-native Go applications with proper separation of concerns. It includes a working example domain (`indexing`) that demonstrates:
+This repository provides a reference implementation for structuring Go applications with clean architecture principles. It demonstrates how to:
 
-- File indexing with domain events
-- OIDC authentication via Keycloak
-- Event streaming with Apache Kafka
-- Server-side rendering with Go templates and HTMX
+- Organize code using **Hexagonal Architecture** (Ports & Adapters)
+- Apply **Domain-Driven Design** tactical patterns (aggregates, entities, value objects, domain events)
+- Integrate authentication via **OIDC/Keycloak**
+- Implement event-driven communication with **Apache Kafka**
+- Connect to local LLMs via **LM Studio** for AI agent capabilities
 
-Use this as a starting point for your own projects or as a reference implementation for DDD/Hexagonal patterns in Go.
+The template includes two bounded contexts (`agent` and `indexing`), an HTTP server with OIDC authentication, and a CLI demonstrating the agent loop pattern.
 
 ---
 
-## Features
+## Key Features
 
-- **Hexagonal Architecture** — Clear separation between domain logic, inbound adapters (HTTP, events), and outbound adapters (persistence, messaging)
-- **Domain-Driven Design** — Aggregates, entities, value objects, domain events, and application services
-- **Event-Driven Architecture** — Kafka-based event publishing and subscribing
+- **Hexagonal Architecture** — Clear separation between domain logic and infrastructure
+- **Domain-Driven Design** — Aggregates, entities, value objects, services, and domain events
 - **OIDC Authentication** — Keycloak integration with session management
-- **Embedded Assets** — Static files and templates compiled into the binary
-- **Production Container** — Multi-stage Dockerfile producing a minimal scratch-based image (~5-10MB)
-- **Profile-Guided Optimization** — PGO support for optimized builds
-- **Developer Experience** — `just` command runner for common tasks
+- **Event Streaming** — Kafka-based pub/sub for domain events
+- **LLM Agent Loop** — Observe → decide → act → update pattern with LM Studio
+- **Production-Ready Docker** — Multi-stage build with PGO optimization (~5-10MB images)
+- **Developer Experience** — `just` task runner, golangci-lint, comprehensive test coverage
 
 ---
 
@@ -66,25 +65,37 @@ Use this as a starting point for your own projects or as a reference implementat
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   cmd/ (Entry Points)                       │
-│           server/main.go       cli/main.go                  │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│           internal/adapters/inbound/ (Driving)              │
-│      HTTP handlers, event subscribers, file readers         │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│                  internal/domain/                           │
-│     Pure business logic: aggregates, entities, services     │
-└─────────────────────────┬───────────────────────────────────┘
-                          │
-┌─────────────────────────▼───────────────────────────────────┐
-│           internal/adapters/outbound/ (Driven)              │
-│       Event publisher (Kafka), file-based repository        │
+│                    Entry Points (cmd/)                      │
+│                   cli/main.go, server/main.go               │
+└──────────────────────────┬──────────────────────────────────┘
+                           │
+┌──────────────────────────▼──────────────────────────────────┐
+│                  Inbound Adapters                           │
+│   HTTP handlers, file readers, event subscribers            │
+│              internal/adapters/inbound/                     │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ implements ports
+┌──────────────────────────▼──────────────────────────────────┐
+│                     Domain Layer                            │
+│   Bounded contexts: agent/, indexing/, event/               │
+│   Aggregates, entities, value objects, services, ports      │
+│                   internal/domain/                          │
+└──────────────────────────┬──────────────────────────────────┘
+                           │ defines ports
+┌──────────────────────────▼──────────────────────────────────┐
+│                  Outbound Adapters                          │
+│   Event publisher, repositories, LLM client                 │
+│              internal/adapters/outbound/                    │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+### Bounded Contexts
+
+| Context | Purpose |
+|---------|---------|
+| `agent` | LLM-based agent with observe→decide→act→update loop |
+| `indexing` | File indexing and repository management |
+| `event` | Domain event contracts and infrastructure |
 
 For detailed architectural documentation, see [CONTEXT.md](CONTEXT.md).
 
@@ -94,119 +105,63 @@ For detailed architectural documentation, see [CONTEXT.md](CONTEXT.md).
 
 ```
 go-ddd-hex-starter/
-├── cmd/                              # Application entry points
-│   ├── cli/                          # CLI demo application
-│   │   ├── main.go                   # CLI entry point with agent demo
-│   │   ├── main_test.go              # CLI tests
-│   │   └── assets/                   # Embedded CLI assets
-│   └── server/                       # HTTP server with OIDC auth
-│       ├── main.go                   # Server entry point
-│       ├── main_test.go              # Server integration tests
-│       └── assets/                   # Embedded server assets
-│           ├── static/               # CSS, JS (HTMX), images
-│           └── templates/            # Go HTML templates (*.tmpl)
-├── internal/                         # Private application code
-│   ├── adapters/                     # Hexagonal adapters layer
-│   │   ├── inbound/                  # Driving adapters
-│   │   │   ├── router.go             # HTTP route definitions
-│   │   │   ├── http_*.go             # HTTP handlers (index, login, view)
-│   │   │   ├── middleware.go         # HTTP middleware (security, logging)
-│   │   │   ├── event_subscriber.go   # Kafka event subscription
-│   │   │   ├── file_reader.go        # Filesystem adapter
-│   │   │   └── *_test.go             # Tests for all adapters
-│   │   └── outbound/                 # Driven adapters
-│   │       ├── event_publisher.go    # Kafka event publishing
-│   │       ├── file_index_repository.go # JSON file persistence
-│   │       ├── lmstudio_client.go    # LM Studio LLM adapter
-│   │       └── *_test.go             # Tests (unit + integration)
-│   └── domain/                       # Domain layer (pure business logic)
-│       ├── event/                    # Event infrastructure interfaces
-│       │   ├── event.go              # Event interface
-│       │   ├── event_publisher.go    # Publisher interface
-│       │   ├── event_subscriber.go   # Subscriber interface
-│       │   └── event_*.go            # Factory, handler types
-│       ├── indexing/                 # File indexing bounded context
-│       │   ├── aggregate.go          # Index aggregate root
-│       │   ├── entities.go           # FileInfo entity
-│       │   ├── value_objects.go      # IndexID value object
-│       │   ├── events.go             # EventFileIndexCreated
-│       │   ├── ports_*.go            # Inbound/outbound port interfaces
-│       │   ├── service.go            # IndexingService (use cases)
-│       │   └── *_test.go             # Domain tests
-│       └── agent/                    # AI agent bounded context
-│           ├── aggregate.go          # Agent aggregate root
-│           ├── entities.go           # Task, Message, ToolCall entities
-│           ├── value_objects.go      # AgentID, TaskID, MessageRole
-│           ├── events.go             # TaskStarted, TaskCompleted events
-│           ├── ports_outbound.go     # LLMClient, ToolExecutor interfaces
-│           ├── service.go            # TaskService (agent loop)
-│           └── *_test.go             # Domain tests
-├── tools/                            # Python development utilities
-│   ├── change_me_local_secret.py     # Secret rotation for local dev
-│   ├── create_pgo.py                 # Profile-Guided Optimization script
-│   └── *_test.py                     # Python unit tests
-├── .justfile                         # Command runner recipes
-├── .env.example                      # Environment template
-├── docker-compose.yml                # Local development stack
-└── Dockerfile                        # Production container build
+├── cmd/                          # Application entry points
+│   ├── cli/                      # CLI application (agent demo)
+│   └── server/                   # HTTP server (OIDC-protected UI)
+├── internal/
+│   ├── adapters/
+│   │   ├── inbound/              # HTTP handlers, file readers, subscribers
+│   │   └── outbound/             # Repositories, publishers, LLM client
+│   └── domain/
+│       ├── agent/                # Agent bounded context
+│       ├── event/                # Shared event infrastructure
+│       └── indexing/             # Indexing bounded context
+├── tools/                        # Build tooling (Python scripts)
+├── .justfile                     # Task runner commands
+├── docker-compose.yml            # Dev stack (Keycloak, Kafka, app)
+└── Dockerfile                    # Multi-stage production build
 ```
-
----
-
-## Prerequisites
-
-- **Go 1.25+**
-- **Python 3** (for development tooling)
-- **Docker** or **Podman** (for container builds)
-- **Docker Compose** (for local development stack)
-- **just** (command runner) — install via `brew install just`
-- **golangci-lint** (for code quality) — install via `brew install golangci-lint`
 
 ---
 
 ## Getting Started
 
-### 1. Clone the Repository
+### Prerequisites
 
-```bash
-git clone https://github.com/andygeiss/go-ddd-hex-starter.git
-cd go-ddd-hex-starter
-```
+- **Go 1.25+**
+- **Docker** and **Docker Compose** (or Podman)
+- **just** task runner
+- **golangci-lint** (for linting/formatting)
 
-### 2. Install Dependencies
+### Installation
 
-```bash
-just setup
-```
+1. **Clone the repository:**
+   ```bash
+   git clone https://github.com/andygeiss/go-ddd-hex-starter.git
+   cd go-ddd-hex-starter
+   ```
 
-This installs `docker-compose`, `golangci-lint`, `just` and `podman` via Homebrew.
+2. **Install development tools:**
+   ```bash
+   just setup
+   ```
+   This installs `docker-compose`, `golangci-lint`, `just`, and `podman` via Homebrew.
 
-### 3. Configure Environment
+3. **Configure environment:**
+   ```bash
+   cp .env.example .env
+   cp .keycloak.json.example .keycloak.json
+   ```
 
-```bash
-cp .env.example .env
-cp .keycloak.json.example .keycloak.json
-```
+4. **Start the development stack:**
+   ```bash
+   just up
+   ```
+   This generates secrets, builds the Docker image, and starts Keycloak, Kafka, and the application.
 
-### 4. Start Services
-
-```bash
-just up
-```
-
-This will:
-1. Generate a random OIDC client secret
-2. Build the Docker image
-3. Start Keycloak, Kafka, and the application
-
-### 5. Access the Application
-
-| Service | URL |
-|---------|-----|
-| Application | http://localhost:8080 |
-| Keycloak Admin | http://localhost:8180/admin |
-
-Default Keycloak credentials: `admin` / `admin`
+5. **Access the application:**
+   - **App:** http://localhost:8080/ui
+   - **Keycloak Admin:** http://localhost:8180/admin (admin:admin)
 
 ---
 
@@ -214,27 +169,30 @@ Default Keycloak credentials: `admin` / `admin`
 
 ### Commands
 
-| Command | Alias | Description |
-|---------|-------|-------------|
-| `just build` | `just b` | Build Docker image |
-| `just up` | `just u` | Start all services |
-| `just down` | `just d` | Stop all services |
-| `just fmt` | — | Format Go code with golangci-lint |
-| `just lint` | — | Run golangci-lint checks |
-| `just test` | `just t` | Run Go + Python tests with coverage |
-| `just serve` | — | Run HTTP server locally |
-| `just run` | — | Run CLI demo locally |
-| `just profile` | — | Generate PGO profiles |
+| Command | Description |
+|---------|-------------|
+| `just setup` | Install development dependencies |
+| `just build` | Build Docker image |
+| `just up` | Start full development stack |
+| `just down` | Stop all services |
+| `just serve` | Run HTTP server locally |
+| `just run` | Run CLI application locally |
+| `just test` | Run unit tests with coverage |
+| `just test-integration` | Run integration tests |
+| `just lint` | Run linter |
+| `just fmt` | Format code |
+| `just profile` | Generate CPU profile for PGO |
 
 ### Running Locally (without Docker)
 
-To run the server locally (requires Kafka and Keycloak running separately):
+To run the server locally (requires Kafka running on localhost:9092):
 
 ```bash
+# Ensure KAFKA_BROKERS is set to localhost:9092 in .env
 just serve
 ```
 
-To run the CLI demo:
+To run the CLI application:
 
 ```bash
 just run
@@ -244,128 +202,105 @@ just run
 
 ## Testing
 
-Run all tests (Go + Python) with coverage:
+### Unit Tests
+
+Run all unit tests with coverage:
 
 ```bash
 just test
 ```
 
-This runs:
-- Go unit tests with coverage (~87% coverage)
-- Python unit tests for development tools
+This runs both Go and Python tests, generating `coverage.pprof`.
 
-Or run tests separately:
+### Integration Tests
+
+Integration tests require external services (LM Studio, Kafka, Keycloak):
 
 ```bash
-# Go tests only
-go test -v ./internal/...
-
-# Python tests only
-cd tools && python3 -m unittest -v
+# Ensure LM_STUDIO_URL and LM_STUDIO_MODEL are set in .env
+just test-integration
 ```
 
-Tests follow the naming convention:
-```
-Test_<Struct>_<Method>_With_<Condition>_Should_<Result>
-```
+### Test Organization
 
-### Test Coverage
-
-| Package | Coverage |
-|---------|----------|
-| `internal/domain/indexing` | ~90% |
-| `internal/adapters/inbound` | ~87% |
-| `internal/adapters/outbound` | ~67% |
-| **Total** | **~87%** |
+- Unit tests are colocated with source files (`*_test.go`)
+- Integration tests are tagged with `//go:build integration`
+- Test fixtures live in `testdata/` directories
 
 ---
 
 ## Configuration
 
-All configuration is via environment variables. See [.env.example](.env.example) for the complete list with documentation.
-
-### Key Variables
+Configuration is managed via environment variables. Copy `.env.example` to `.env` and customize:
 
 | Variable | Description | Default |
 |----------|-------------|---------|
+| `APP_NAME` | Display name for UI | `Template` |
+| `APP_SHORTNAME` | Docker image/container name | `template` |
 | `PORT` | HTTP server port | `8080` |
 | `KAFKA_BROKERS` | Kafka broker addresses | `localhost:9092` |
 | `OIDC_ISSUER` | Keycloak realm URL | `http://localhost:8180/realms/local` |
-| `OIDC_CLIENT_ID` | OIDC client identifier | `template` |
-| `OIDC_CLIENT_SECRET` | OIDC client secret | (generated) |
+| `OIDC_CLIENT_ID` | OIDC client ID | `template` |
+| `OIDC_CLIENT_SECRET` | OIDC client secret | Auto-generated |
+| `LM_STUDIO_URL` | LM Studio API URL | `http://localhost:1234` |
+| `LM_STUDIO_MODEL` | LLM model name | `qwen/qwen3-coder-30b` |
+
+See `.env.example` for the complete list with documentation.
 
 ---
 
 ## Using as a Template
 
-1. Update `go.mod` with your module path
-2. Update all imports to match
-3. Configure `.env.example` with your application metadata
-4. Replace or extend `internal/domain/indexing/` with your domains
-5. Implement adapters for your infrastructure
+### Quick Start
 
-See [CONTEXT.md](CONTEXT.md) for detailed conventions and guidelines.
+1. **Clone and reinitialize:**
+   ```bash
+   git clone https://github.com/andygeiss/go-ddd-hex-starter my-project
+   cd my-project
+   rm -rf .git && git init
+   ```
+
+2. **Update module path:**
+   ```bash
+   go mod edit -module github.com/yourorg/my-project
+   # Update import paths in all .go files
+   ```
+
+3. **Configure project identity:**
+   ```bash
+   cp .env.example .env
+   # Edit APP_NAME, APP_SHORTNAME, APP_DESCRIPTION
+   ```
+
+4. **Add your domain logic:**
+   - Create bounded contexts in `internal/domain/`
+   - Implement adapters in `internal/adapters/`
+   - Wire up entry points in `cmd/`
+
+### What to Keep
+
+- Directory structure (`cmd/`, `internal/adapters/`, `internal/domain/`)
+- Hexagonal architecture pattern
+- `cloud-native-utils` as infrastructure library
+- `context.Context` threading through all layers
+
+### What to Customize
+
+- Bounded contexts and domain logic
+- Static assets and templates in `cmd/*/assets/`
+- Environment configuration in `.env`
+- Docker Compose services as needed
+
+For detailed conventions and rules, see [CONTEXT.md](CONTEXT.md).
 
 ---
 
-## Common Pitfalls
+## Contributing
 
-When adapting this template for your own project, watch out for these common issues:
-
-### Module Path Changes
-
-After renaming the module in `go.mod`, you must update **all** import paths across the codebase:
-
-```bash
-# Find all files with the old import path
-grep -r "github.com/andygeiss/go-ddd-hex-starter" --include="*.go"
-
-# Use sed or your editor to replace with your new module path
-```
-
-Missing imports will cause cryptic "package not found" errors at build time.
-
-### Keycloak Configuration Alignment
-
-The OIDC flow requires exact alignment between three places:
-
-| Setting | Location | Must Match |
-|---------|----------|------------|
-| Realm name | Keycloak Admin UI | `OIDC_ISSUER` URL path |
-| Client ID | Keycloak → Clients | `OIDC_CLIENT_ID` env var |
-| Client Secret | Keycloak → Clients → Credentials | `OIDC_CLIENT_SECRET` env var |
-| Valid Redirect URIs | Keycloak → Clients | Your app's callback URL |
-
-**Tip:** After changing Keycloak settings, restart the application — secrets are read at startup.
-
-### Kafka Topic Naming
-
-Topics must be created before the application starts, or Kafka auto-creation must be enabled. Ensure:
-
-- Topic names in code match what's configured in Kafka
-- The `KAFKA_BROKERS` environment variable points to accessible brokers
-- Network connectivity exists between your app container and Kafka
-
-### Docker Compose Port Conflicts
-
-Default ports may conflict with existing services:
-
-| Service | Default Port | Change In |
-|---------|--------------|-----------|
-| Application | 8080 | `docker-compose.yml`, `PORT` env |
-| Keycloak | 8180 | `docker-compose.yml`, `OIDC_ISSUER` |
-| Kafka | 9092 | `docker-compose.yml`, `KAFKA_BROKERS` |
-
-### Embedded Assets Not Updating
-
-Go's `//go:embed` caches files at compile time. If you modify templates or static files:
-
-```bash
-# Force a clean rebuild
-go build -a ./cmd/server
-# Or use just
-just build
-```
+1. Follow the coding conventions documented in [CONTEXT.md](CONTEXT.md)
+2. Ensure all tests pass: `just test`
+3. Ensure code is formatted and linted: `just fmt && just lint`
+4. Update documentation if architecture changes
 
 ---
 
