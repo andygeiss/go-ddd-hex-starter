@@ -1,5 +1,5 @@
 <p align="center">
-<img src="https://github.com/andygeiss/go-ddd-hex-starter/blob/main/cmd/server/assets/static/img/icon.png?raw=true" width="100"/>
+<img src="https://github.com/andygeiss/go-ddd-hex-starter/blob/main/cmd/server/assets/static/img/icon-192.png?raw=true" width="100"/>
 </p>
 
 # Go DDD Hexagonal Starter
