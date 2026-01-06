@@ -114,7 +114,7 @@ def main() -> None:
 
     # 1. Generate a new secure secret
     secret = generate_secret(32)
-    print(f"Generated new secret: {secret}")
+    # Note: We intentionally do NOT print the secret to avoid exposing it in logs or terminal history.
 
     # 2. Update configuration files
     # We attempt to update both files. If one is missing (e.g., before copying from

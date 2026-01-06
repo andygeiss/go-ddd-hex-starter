@@ -47,6 +47,7 @@ Template note:
 
 import glob
 import os
+import re
 import subprocess
 import sys
 
@@ -58,18 +59,46 @@ PACKAGES_TO_PROFILE = [
     "internal/adapters/outbound",
 ]
 
+# Regex pattern for valid Go package paths (alphanumeric, underscores, hyphens, slashes)
+# This prevents any shell metacharacters or path traversal attempts.
+VALID_PACKAGE_PATTERN = re.compile(r"^[a-zA-Z0-9_\-/]+$")
 
-def run_command(command, shell=False, check=True):
+
+def validate_package_path(pkg: str) -> bool:
     """
-    Runs a shell command and handles errors gracefully.
+    Validates that a package path is safe for use in subprocess commands.
 
     Args:
-        command (list or str): The command to run.
-        shell (bool): Whether to run the command in a shell.
+        pkg: The package path to validate.
+
+    Returns:
+        True if the package path is valid, False otherwise.
+
+    Security:
+        This prevents command injection by ensuring package paths only contain
+        safe characters (alphanumeric, underscores, hyphens, forward slashes).
+        It also rejects path traversal attempts (../).
+    """
+    if not pkg:
+        return False
+    if ".." in pkg:  # Reject path traversal
+        return False
+    if not VALID_PACKAGE_PATTERN.match(pkg):
+        return False
+    return True
+
+
+def run_command(command, check=True, stdout=None):
+    """
+    Runs a command and handles errors gracefully.
+
+    Args:
+        command (list): The command and arguments as a list.
         check (bool): Whether to raise an exception on non-zero exit codes.
+        stdout: Optional file handle for stdout redirection.
     """
     try:
-        subprocess.run(command, shell=shell, check=check)
+        subprocess.run(command, check=check, stdout=stdout)
     except subprocess.CalledProcessError as e:
         print(f"Error running command: {command}")
         sys.exit(e.returncode)
@@ -77,6 +106,14 @@ def run_command(command, shell=False, check=True):
 
 def main():
     print("Starting PGO profile generation...")
+
+    # -------------------------------------------------------------------------
+    # 0. Validate package paths (defense-in-depth)
+    # -------------------------------------------------------------------------
+    for pkg in PACKAGES_TO_PROFILE:
+        if not validate_package_path(pkg):
+            print(f"Error: Invalid package path '{pkg}'. Aborting for security.")
+            sys.exit(1)
 
     # -------------------------------------------------------------------------
     # 1. Cleanup existing profiles
@@ -138,9 +175,14 @@ def main():
     print("Merging profiles...")
     # The Go compiler needs a single profile file. We use 'go tool pprof' to merge
     # the individual package profiles into one.
-    # We use shell=True here to leverage globbing (cpuprofile-*.pprof) in the command.
-    merge_cmd = "go tool pprof -proto cpuprofile-*.pprof > cpuprofile-merged.pprof"
-    run_command(merge_cmd, shell=True)
+    # We use Python's glob to expand the pattern safely (avoiding shell=True).
+    profile_files = glob.glob("cpuprofile-*.pprof")
+    if not profile_files:
+        print("Error: No profile files found to merge.")
+        sys.exit(1)
+    merge_cmd = ["go", "tool", "pprof", "-proto"] + profile_files
+    with open("cpuprofile-merged.pprof", "wb") as outfile:
+        run_command(merge_cmd, stdout=outfile)
 
     # -------------------------------------------------------------------------
     # 4. Finalize profile file
@@ -164,8 +206,9 @@ def main():
     print("Generating SVG visualization...")
     # Create an SVG graph of the profile. This is useful for developers to see
     # where the application is spending its time (hot paths).
-    svg_cmd = "go tool pprof -svg cpuprofile.pprof > cpuprofile.svg"
-    run_command(svg_cmd, shell=True)
+    svg_cmd = ["go", "tool", "pprof", "-svg", "cpuprofile.pprof"]
+    with open("cpuprofile.svg", "wb") as outfile:
+        run_command(svg_cmd, stdout=outfile)
 
     # -------------------------------------------------------------------------
     # 6. Cleanup intermediate files

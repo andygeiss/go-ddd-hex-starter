@@ -21,7 +21,60 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from create_pgo import PACKAGES_TO_PROFILE, run_command
+from create_pgo import PACKAGES_TO_PROFILE, run_command, validate_package_path
+
+
+class TestValidatePackagePath(unittest.TestCase):
+    """Tests for the validate_package_path function."""
+
+    def test_valid_simple_package(self):
+        """Simple package path should be valid."""
+        self.assertTrue(validate_package_path("cmd/server"))
+
+    def test_valid_nested_package(self):
+        """Nested package path should be valid."""
+        self.assertTrue(validate_package_path("internal/adapters/inbound"))
+
+    def test_valid_with_underscore(self):
+        """Package with underscore should be valid."""
+        self.assertTrue(validate_package_path("my_package/sub_dir"))
+
+    def test_valid_with_hyphen(self):
+        """Package with hyphen should be valid."""
+        self.assertTrue(validate_package_path("my-package/sub-dir"))
+
+    def test_invalid_empty_string(self):
+        """Empty string should be invalid."""
+        self.assertFalse(validate_package_path(""))
+
+    def test_invalid_path_traversal(self):
+        """Path traversal attempts should be invalid."""
+        self.assertFalse(validate_package_path("../etc/passwd"))
+        self.assertFalse(validate_package_path("cmd/../../../etc"))
+        self.assertFalse(validate_package_path(".."))
+
+    def test_invalid_shell_metacharacters(self):
+        """Shell metacharacters should be rejected."""
+        self.assertFalse(validate_package_path("cmd; rm -rf /"))
+        self.assertFalse(validate_package_path("cmd && echo pwned"))
+        self.assertFalse(validate_package_path("cmd | cat /etc/passwd"))
+        self.assertFalse(validate_package_path("$(whoami)"))
+        self.assertFalse(validate_package_path("`whoami`"))
+
+    def test_invalid_special_characters(self):
+        """Special characters should be rejected."""
+        self.assertFalse(validate_package_path("cmd/server$VAR"))
+        self.assertFalse(validate_package_path("cmd/server*"))
+        self.assertFalse(validate_package_path("cmd/server?"))
+        self.assertFalse(validate_package_path("cmd/server[0]"))
+
+    def test_all_configured_packages_are_valid(self):
+        """All packages in PACKAGES_TO_PROFILE should pass validation."""
+        for pkg in PACKAGES_TO_PROFILE:
+            self.assertTrue(
+                validate_package_path(pkg),
+                f"Configured package '{pkg}' should be valid"
+            )
 
 
 class TestPackagesToProfile(unittest.TestCase):
@@ -64,14 +117,17 @@ class TestRunCommand(unittest.TestCase):
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
             run_command(["echo", "test"])
-            mock_run.assert_called_once_with(["echo", "test"], shell=False, check=True)
+            mock_run.assert_called_once_with(["echo", "test"], check=True, stdout=None)
 
-    def test_run_command_with_shell(self):
-        """Command with shell=True should pass shell argument."""
+    def test_run_command_with_stdout_redirect(self):
+        """Command with stdout should pass stdout argument."""
         with patch("subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0)
-            run_command("echo test", shell=True)
-            mock_run.assert_called_once_with("echo test", shell=True, check=True)
+            mock_file = MagicMock()
+            run_command(["echo", "test"], stdout=mock_file)
+            mock_run.assert_called_once_with(
+                ["echo", "test"], check=True, stdout=mock_file
+            )
 
     def test_run_command_failure_exits(self):
         """Failed command should exit with the error code."""
@@ -198,11 +254,16 @@ class TestMergeCommand(unittest.TestCase):
 
     def test_merge_command_structure(self):
         """Merge command should use go tool pprof with proto output."""
-        merge_cmd = "go tool pprof -proto cpuprofile-*.pprof > cpuprofile-merged.pprof"
-        self.assertIn("go tool pprof", merge_cmd)
+        # The merge command is now a list (no shell=True needed)
+        profile_files = ["cpuprofile-cmd__server.pprof", "cpuprofile-internal__adapters__inbound.pprof"]
+        merge_cmd = ["go", "tool", "pprof", "-proto"] + profile_files
+        self.assertIn("go", merge_cmd)
+        self.assertIn("tool", merge_cmd)
+        self.assertIn("pprof", merge_cmd)
         self.assertIn("-proto", merge_cmd)
-        self.assertIn("cpuprofile-*.pprof", merge_cmd)
-        self.assertIn("> cpuprofile-merged.pprof", merge_cmd)
+        # Profile files should be appended to the command
+        for pf in profile_files:
+            self.assertIn(pf, merge_cmd)
 
 
 class TestSvgCommand(unittest.TestCase):
@@ -210,11 +271,13 @@ class TestSvgCommand(unittest.TestCase):
 
     def test_svg_command_structure(self):
         """SVG command should use go tool pprof with svg output."""
-        svg_cmd = "go tool pprof -svg cpuprofile.pprof > cpuprofile.svg"
-        self.assertIn("go tool pprof", svg_cmd)
+        # The SVG command is now a list (no shell=True needed)
+        svg_cmd = ["go", "tool", "pprof", "-svg", "cpuprofile.pprof"]
+        self.assertIn("go", svg_cmd)
+        self.assertIn("tool", svg_cmd)
+        self.assertIn("pprof", svg_cmd)
         self.assertIn("-svg", svg_cmd)
         self.assertIn("cpuprofile.pprof", svg_cmd)
-        self.assertIn("> cpuprofile.svg", svg_cmd)
 
 
 class TestFileOperations(unittest.TestCase):
