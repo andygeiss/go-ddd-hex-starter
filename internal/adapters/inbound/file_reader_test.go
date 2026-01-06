@@ -18,17 +18,16 @@ import (
 
 func Test_FileReader_ReadFileInfos_With_Current_Path_Should_Return_Two_Files(t *testing.T) {
 	// Arrange
-	_ = os.MkdirAll("testdata", 0755)
-	defer func() { _ = os.RemoveAll("testdata") }()
+	tempDir := t.TempDir()
 	r := inbound.NewFileReader()
 	wanted := 2
 	for i := range wanted {
-		_, _ = os.Create(fmt.Sprintf("testdata/file%d.txt", i))
+		_, _ = os.Create(fmt.Sprintf("%s/file%d.txt", tempDir, i))
 	}
 	ctx := context.Background()
 
 	// Act
-	fileInfos, err := r.ReadFileInfos(ctx, "testdata")
+	fileInfos, err := r.ReadFileInfos(ctx, tempDir)
 
 	// Assert
 	assert.That(t, "err must be nil", err, nil)
@@ -52,17 +51,16 @@ const (
 
 func Benchmark_FileReader_ReadFileInfos_With_1000_Entries_Should_Be_Fast(b *testing.B) {
 	// Arrange
-	_ = os.MkdirAll("testdata", 0755)
-	defer func() { _ = os.RemoveAll("testdata") }()
+	tempDir := b.TempDir()
 	reader := inbound.NewFileReader()
 	ctx := context.Background()
 
-	// Create BenchmarkMaxFileCount number of files in testdata.
+	// Create BenchmarkMaxFileCount number of files in tempDir.
 	// Each file should have a unique name and a random content.
 	// Each file must be BenchmarkMaxFileSize bytes long.
 	// We use a range loop over an int to create the files.
 	for i := range BenchmarkMaxFileCount {
-		file, err := os.Create(fmt.Sprintf("testdata/file%d.txt", i))
+		file, err := os.Create(fmt.Sprintf("%s/file%d.txt", tempDir, i))
 		if err != nil {
 			b.Fatal(err)
 		}
@@ -79,7 +77,7 @@ func Benchmark_FileReader_ReadFileInfos_With_1000_Entries_Should_Be_Fast(b *test
 	// This is the new way to iterate over the benchmark loop.
 	for b.Loop() {
 		// Read all generated file infos.
-		fileInfos, err := reader.ReadFileInfos(ctx, "testdata")
+		fileInfos, err := reader.ReadFileInfos(ctx, tempDir)
 		if err != nil {
 			b.Fatal(err)
 		}

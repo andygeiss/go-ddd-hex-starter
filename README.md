@@ -30,6 +30,8 @@ A production-ready Go starter template demonstrating Domain-Driven Design (DDD) 
 - [Usage](#usage)
 - [Testing](#testing)
 - [Configuration](#configuration)
+- [Using as a Template](#using-as-a-template)
+- [Common Pitfalls](#common-pitfalls)
 - [License](#license)
 
 ---
@@ -268,6 +270,67 @@ All configuration is via environment variables. See [.env.example](.env.example)
 5. Implement adapters for your infrastructure
 
 See [CONTEXT.md](CONTEXT.md) for detailed conventions and guidelines.
+
+---
+
+## Common Pitfalls
+
+When adapting this template for your own project, watch out for these common issues:
+
+### Module Path Changes
+
+After renaming the module in `go.mod`, you must update **all** import paths across the codebase:
+
+```bash
+# Find all files with the old import path
+grep -r "github.com/andygeiss/go-ddd-hex-starter" --include="*.go"
+
+# Use sed or your editor to replace with your new module path
+```
+
+Missing imports will cause cryptic "package not found" errors at build time.
+
+### Keycloak Configuration Alignment
+
+The OIDC flow requires exact alignment between three places:
+
+| Setting | Location | Must Match |
+|---------|----------|------------|
+| Realm name | Keycloak Admin UI | `OIDC_ISSUER` URL path |
+| Client ID | Keycloak → Clients | `OIDC_CLIENT_ID` env var |
+| Client Secret | Keycloak → Clients → Credentials | `OIDC_CLIENT_SECRET` env var |
+| Valid Redirect URIs | Keycloak → Clients | Your app's callback URL |
+
+**Tip:** After changing Keycloak settings, restart the application — secrets are read at startup.
+
+### Kafka Topic Naming
+
+Topics must be created before the application starts, or Kafka auto-creation must be enabled. Ensure:
+
+- Topic names in code match what's configured in Kafka
+- The `KAFKA_BROKERS` environment variable points to accessible brokers
+- Network connectivity exists between your app container and Kafka
+
+### Docker Compose Port Conflicts
+
+Default ports may conflict with existing services:
+
+| Service | Default Port | Change In |
+|---------|--------------|-----------|
+| Application | 8080 | `docker-compose.yml`, `PORT` env |
+| Keycloak | 8180 | `docker-compose.yml`, `OIDC_ISSUER` |
+| Kafka | 9092 | `docker-compose.yml`, `KAFKA_BROKERS` |
+
+### Embedded Assets Not Updating
+
+Go's `//go:embed` caches files at compile time. If you modify templates or static files:
+
+```bash
+# Force a clean rebuild
+go build -a ./cmd/server
+# Or use just
+just build
+```
 
 ---
 

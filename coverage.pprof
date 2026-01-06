@@ -64,4 +64,4 @@ github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound/middleware.go:
 github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound/middleware.go:11.54,22.3 3 1
 github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound/middleware.go:26.66,27.54 1 1
 github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound/middleware.go:27.54,41.3 5 1
-github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound/router.go:16.83,50.2 8 1
+github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound/router.go:16.83,50.2 8 0
