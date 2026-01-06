@@ -153,6 +153,92 @@ The only case to use directly is for advanced Kafka features (consumer groups, p
 
 ---
 
+### LM Studio (OpenAI-compatible API)
+
+- **Purpose:** Local LLM inference server with OpenAI-compatible REST API. Enables running large language models locally for AI agent functionality.
+- **Website:** [lmstudio.ai](https://lmstudio.ai/)
+- **API Compatibility:** OpenAI Chat Completions API (`/v1/chat/completions`)
+- **Status:** External service (not a Go dependency)
+
+#### Integration in This Project
+
+The `agent` bounded context uses LM Studio through `internal/adapters/outbound/lmstudio_client.go`:
+
+| Component | Purpose |
+|-----------|---------|
+| `LMStudioClient` | Implements `agent.LLMClient` interface |
+| `Run(ctx, messages)` | Sends conversation to LM Studio, returns LLM response |
+| `convertToAPIMessages` | Translates domain `agent.Message` to OpenAI format |
+| `convertToResponse` | Translates OpenAI response to domain `agent.LLMResponse` |
+
+#### Configuration
+
+| Environment Variable | Purpose | Default |
+|---------------------|---------|---------|
+| `LM_STUDIO_URL` | Base URL for LM Studio API | `http://localhost:1234` |
+| `LM_STUDIO_MODEL` | Model identifier to use | `default` (uses loaded model) |
+
+#### When to Use
+
+| Concern | Pattern |
+|---------|---------|
+| **AI agent tasks** | Use `agent.TaskService` with `LMStudioClient` |
+| **Custom LLM calls** | Implement `agent.LLMClient` interface |
+| **Testing** | Create mock `LLMClient` for unit tests |
+| **Integration testing** | Use `//go:build integration` tag with real LM Studio |
+
+#### Integration Patterns
+
+**Creating an LLM Client:**
+```go
+import "github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
+
+client := outbound.NewLMStudioClient(
+    os.Getenv("LM_STUDIO_URL"),
+    os.Getenv("LM_STUDIO_MODEL"),
+)
+```
+
+**Using with TaskService:**
+```go
+import "github.com/andygeiss/go-ddd-hex-starter/internal/domain/agent"
+
+service := agent.NewTaskService(client, toolExecutor, publisher)
+result, err := service.RunTask(ctx, agentInstance, task)
+```
+
+**Custom HTTP Client (for timeouts):**
+```go
+httpClient := &http.Client{Timeout: 60 * time.Second}
+client := outbound.NewLMStudioClient(url, model).WithHTTPClient(httpClient)
+```
+
+#### Cautions
+
+- **Local service required:** LM Studio must be running locally with the API server enabled
+- **Model loading:** Ensure a model is loaded in LM Studio before making requests
+- **Timeouts:** LLM responses can be slow; use appropriate HTTP client timeouts (60s+ recommended)
+- **Memory usage:** Large models require significant RAM/VRAM
+- **No authentication:** LM Studio local API has no authentication; only use on trusted networks
+- **OpenAI compatibility:** Not all OpenAI features are supported (e.g., function calling may vary by model)
+
+#### Alternative Implementations
+
+The `agent.LLMClient` interface is designed to be implementation-agnostic:
+
+```go
+type LLMClient interface {
+    Run(ctx context.Context, messages []Message) (LLMResponse, error)
+}
+```
+
+To use a different LLM provider (OpenAI, Anthropic, Ollama, etc.):
+1. Create a new adapter in `internal/adapters/outbound/`
+2. Implement the `agent.LLMClient` interface
+3. Inject the new client into `TaskService`
+
+---
+
 ## Python Standard Library (Tooling)
 
 Python scripts in `tools/` use only the standard library to avoid external dependencies.
@@ -234,6 +320,15 @@ Python scripts in `tools/` use only the standard library to avoid external depen
 | JSON file storage | `cloud-native-utils/resource` | `resource.NewJsonFileAccess[K, V](file)` |
 | In-memory storage | `cloud-native-utils/resource` | `resource.NewInMemoryAccess[K, V]()` |
 
+### AI / LLM Integration
+
+| Concern | Vendor | Pattern |
+|---------|--------|---------|
+| LLM client interface | Domain port | `agent.LLMClient` in `internal/domain/agent/ports_outbound.go` |
+| LM Studio adapter | Project adapter | `outbound.NewLMStudioClient(url, model)` |
+| Tool execution | Domain port | `agent.ToolExecutor` interface |
+| Agent loop | Domain service | `agent.NewTaskService(client, executor, publisher)` |
+
 ### Resilience
 
 | Concern | Vendor | Pattern |
@@ -276,6 +371,12 @@ Python scripts in `tools/` use only the standard library to avoid external depen
 **Avoid:** wire, dig, fx
 
 **Reason:** This project uses constructor-based dependency injection. Functions like `NewIndexingService(reader, repo, publisher)` provide explicit, traceable dependencies without magic.
+
+### LLM Client Libraries
+
+**Avoid:** langchaingo, go-openai (as direct dependencies)
+
+**Reason:** The `agent.LLMClient` interface provides a minimal abstraction over LLM APIs. The `LMStudioClient` adapter implements OpenAI-compatible HTTP calls directly (~100 lines). This keeps the codebase lean and avoids pulling in large framework dependencies. If you need a different LLM provider, implement the interface directly rather than adding a framework.
 
 ---
 

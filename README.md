@@ -94,26 +94,61 @@ For detailed architectural documentation, see [CONTEXT.md](CONTEXT.md).
 
 ```
 go-ddd-hex-starter/
-├── cmd/
-│   ├── cli/                  # CLI demo application
-│   │   └── main_test.go      # CLI unit and integration tests
-│   └── server/               # HTTP server with OIDC auth
-│       ├── main_test.go      # Server integration tests
-│       └── assets/           # Embedded templates and static files
-├── internal/
-│   ├── adapters/
-│   │   ├── inbound/          # HTTP handlers, event subscribers (with tests)
-│   │   └── outbound/         # Repositories, event publishers (with tests)
-│   └── domain/
-│       ├── event/            # Event interfaces (with tests)
-│       └── indexing/         # Example bounded context (with tests)
-├── tools/                    # Python development utilities
-│   ├── *_test.py             # Python unit tests
-│   ├── change_me_local_secret.py
-│   └── create_pgo.py
-├── .justfile                 # Command runner recipes
-├── docker-compose.yml        # Local development stack
-└── Dockerfile                # Production container build
+├── cmd/                              # Application entry points
+│   ├── cli/                          # CLI demo application
+│   │   ├── main.go                   # CLI entry point with agent demo
+│   │   ├── main_test.go              # CLI tests
+│   │   └── assets/                   # Embedded CLI assets
+│   └── server/                       # HTTP server with OIDC auth
+│       ├── main.go                   # Server entry point
+│       ├── main_test.go              # Server integration tests
+│       └── assets/                   # Embedded server assets
+│           ├── static/               # CSS, JS (HTMX), images
+│           └── templates/            # Go HTML templates (*.tmpl)
+├── internal/                         # Private application code
+│   ├── adapters/                     # Hexagonal adapters layer
+│   │   ├── inbound/                  # Driving adapters
+│   │   │   ├── router.go             # HTTP route definitions
+│   │   │   ├── http_*.go             # HTTP handlers (index, login, view)
+│   │   │   ├── middleware.go         # HTTP middleware (security, logging)
+│   │   │   ├── event_subscriber.go   # Kafka event subscription
+│   │   │   ├── file_reader.go        # Filesystem adapter
+│   │   │   └── *_test.go             # Tests for all adapters
+│   │   └── outbound/                 # Driven adapters
+│   │       ├── event_publisher.go    # Kafka event publishing
+│   │       ├── file_index_repository.go # JSON file persistence
+│   │       ├── lmstudio_client.go    # LM Studio LLM adapter
+│   │       └── *_test.go             # Tests (unit + integration)
+│   └── domain/                       # Domain layer (pure business logic)
+│       ├── event/                    # Event infrastructure interfaces
+│       │   ├── event.go              # Event interface
+│       │   ├── event_publisher.go    # Publisher interface
+│       │   ├── event_subscriber.go   # Subscriber interface
+│       │   └── event_*.go            # Factory, handler types
+│       ├── indexing/                 # File indexing bounded context
+│       │   ├── aggregate.go          # Index aggregate root
+│       │   ├── entities.go           # FileInfo entity
+│       │   ├── value_objects.go      # IndexID value object
+│       │   ├── events.go             # EventFileIndexCreated
+│       │   ├── ports_*.go            # Inbound/outbound port interfaces
+│       │   ├── service.go            # IndexingService (use cases)
+│       │   └── *_test.go             # Domain tests
+│       └── agent/                    # AI agent bounded context
+│           ├── aggregate.go          # Agent aggregate root
+│           ├── entities.go           # Task, Message, ToolCall entities
+│           ├── value_objects.go      # AgentID, TaskID, MessageRole
+│           ├── events.go             # TaskStarted, TaskCompleted events
+│           ├── ports_outbound.go     # LLMClient, ToolExecutor interfaces
+│           ├── service.go            # TaskService (agent loop)
+│           └── *_test.go             # Domain tests
+├── tools/                            # Python development utilities
+│   ├── change_me_local_secret.py     # Secret rotation for local dev
+│   ├── create_pgo.py                 # Profile-Guided Optimization script
+│   └── *_test.py                     # Python unit tests
+├── .justfile                         # Command runner recipes
+├── .env.example                      # Environment template
+├── docker-compose.yml                # Local development stack
+└── Dockerfile                        # Production container build
 ```
 
 ---

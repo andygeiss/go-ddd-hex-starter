@@ -158,3 +158,24 @@ test:
     @echo ""
     @echo "Running Python tests..."
     @cd tools && python3 -m unittest change_me_local_secret_test create_pgo_test -v
+
+# ======================================
+# Test Integration - Run integration tests
+# ======================================
+# Runs integration tests that require external services (e.g., LM Studio)
+# These tests are tagged with //go:build integration and are skipped by default
+#
+# Requirements:
+# - LM Studio must be running locally (default: http://localhost:1234)
+# - Set LM_STUDIO_URL and LM_STUDIO_MODEL in .env or environment
+#
+# Usage:
+#   just test-integration                    # Run all integration tests
+#   just test-integration ./internal/...     # Run integration tests in specific path
+
+test-integration *ARGS='./internal/...':
+    @echo "Running integration tests..."
+    @echo "LM_STUDIO_URL=${LM_STUDIO_URL:-http://localhost:1234}"
+    @echo "LM_STUDIO_MODEL=${LM_STUDIO_MODEL:-default}"
+    @echo ""
+    @go test -tags=integration -v {{ ARGS }}

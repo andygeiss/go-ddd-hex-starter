@@ -4,7 +4,11 @@
 
 This repository is a **Go starter template** demonstrating Domain-Driven Design (DDD) and Hexagonal Architecture (Ports & Adapters) patterns. It provides a production-ready foundation for building cloud-native Go applications with clean separation of concerns, event-driven architecture, and infrastructure-as-code containerization.
 
-The template includes a working example domain (`indexing`) that demonstrates file indexing with event publishing, OIDC authentication via Keycloak, and Kafka-based messaging. It serves as a reference implementation and scaffolding for teams adopting DDD/Hexagonal patterns in Go.
+The template includes two working example domains:
+- **`indexing`** — demonstrates file indexing with event publishing
+- **`agent`** — demonstrates an AI agent with observe → decide → act → update loop, LLM integration (LM Studio), and tool execution
+
+Both domains showcase event-driven communication, OIDC authentication via Keycloak, and Kafka-based messaging. They serve as reference implementations and scaffolding for teams adopting DDD/Hexagonal patterns in Go.
 
 ---
 
@@ -16,6 +20,7 @@ The template includes a working example domain (`indexing`) that demonstrates fi
 | **Core Library** | `github.com/andygeiss/cloud-native-utils` v0.4.10 (logging, security, messaging, templating, resource access) |
 | **Authentication** | OpenID Connect via Keycloak (`github.com/coreos/go-oidc/v3`) |
 | **Messaging** | Apache Kafka (`github.com/segmentio/kafka-go`) |
+| **LLM Integration** | LM Studio with OpenAI-compatible API (local LLM server) |
 | **Frontend** | Server-side Go templates with HTMX, vanilla CSS |
 | **Build System** | `just` (command runner), Podman/Docker |
 | **Containerization** | Multi-stage Dockerfile (scratch-based runtime) |
@@ -44,19 +49,19 @@ This project implements **Hexagonal Architecture** (Ports & Adapters) with DDD t
 ┌───────────────────────────▼─────────────────────────────────────┐
 │                   internal/domain/                              │
 │    event/       - Event interfaces (Event, Publisher, Subscriber)
-│    indexing/    - Example bounded context                       │
-│      ├── aggregate.go      (Index aggregate root)               │
-│      ├── entities.go       (FileInfo entity)                    │
-│      ├── value_objects.go  (IndexID)                            │
-│      ├── events.go         (EventFileIndexCreated)              │
-│      ├── ports_inbound.go  (FileReader interface)               │
-│      ├── ports_outbound.go (IndexRepository interface)          │
-│      └── service.go        (IndexingService - use cases)        │
+│    indexing/    - File indexing bounded context                 │
+│    agent/       - AI agent bounded context                      │
+│      ├── aggregate.go      (Agent aggregate root)               │
+│      ├── entities.go       (Task, Message, ToolCall entities)   │
+│      ├── value_objects.go  (AgentID, TaskID, MessageRole, etc.) │
+│      ├── events.go         (TaskStarted, TaskCompleted, etc.)   │
+│      ├── ports_outbound.go (LLMClient, ToolExecutor interfaces) │
+│      └── service.go        (TaskService - agent loop use cases) │
 └───────────────────────────┬─────────────────────────────────────┘
                             │
 ┌───────────────────────────▼─────────────────────────────────────┐
 │              internal/adapters/outbound/ (Driven)               │
-│    Event publisher (Kafka), file-based repository               │
+│    Event publisher (Kafka), file-based repository, LLM client   │
 │    Implements domain ports; interacts with external systems     │
 └─────────────────────────────────────────────────────────────────┘
 ```
@@ -105,11 +110,14 @@ go-ddd-hex-starter/
 │   │   │   ├── file_reader.go    # Filesystem adapter
 │   │   │   ├── file_reader_test.go # File reader tests
 │   │   │   └── testdata/         # Test assets (templates, static files)
-│   │   └── outbound/             # Driven adapters (persistence, messaging)
+│   │   └── outbound/             # Driven adapters (persistence, messaging, LLM)
 │   │       ├── event_publisher.go    # Kafka event publishing
 │   │       ├── event_publisher_test.go # Publisher tests
 │   │       ├── file_index_repository.go # JSON file persistence
-│   │       └── file_index_repository_test.go # Repository tests
+│   │       ├── file_index_repository_test.go # Repository tests
+│   │       ├── lmstudio_client.go    # LM Studio LLM adapter (OpenAI-compatible)
+│   │       ├── lmstudio_client_test.go # LLM client unit tests
+│   │       └── lmstudio_client_integration_test.go # LLM integration tests
 │   └── domain/                   # Domain layer (pure business logic)
 │       ├── event/                # Event infrastructure interfaces
 │       │   ├── event.go          # Event interface
@@ -118,18 +126,30 @@ go-ddd-hex-starter/
 │       │   ├── event_subscriber.go # Subscriber interface
 │       │   ├── event_factory.go  # Factory function type
 │       │   └── event_handler.go  # Handler function type
-│       └── indexing/             # Example bounded context
-│           ├── aggregate.go      # Aggregate root
+│       ├── indexing/             # File indexing bounded context
+│       │   ├── aggregate.go      # Aggregate root
+│       │   ├── aggregate_test.go # Aggregate tests
+│       │   ├── entities.go       # Domain entities
+│       │   ├── entities_test.go  # Entity tests
+│       │   ├── events.go         # Domain events
+│       │   ├── events_test.go    # Event tests
+│       │   ├── ports_inbound.go  # Inbound port interfaces
+│       │   ├── ports_outbound.go # Outbound port interfaces
+│       │   ├── service.go        # Application service
+│       │   ├── service_test.go   # Service tests
+│       │   ├── value_objects.go  # Value objects
+│       │   └── value_objects_test.go # Value object tests
+│       └── agent/                # AI agent bounded context
+│           ├── aggregate.go      # Agent aggregate root (state, tasks, messages)
 │           ├── aggregate_test.go # Aggregate tests
-│           ├── entities.go       # Domain entities
+│           ├── entities.go       # Task, Message, ToolCall, Result entities
 │           ├── entities_test.go  # Entity tests
-│           ├── events.go         # Domain events
+│           ├── events.go         # Domain events (TaskStarted, TaskCompleted, etc.)
 │           ├── events_test.go    # Event tests
-│           ├── ports_inbound.go  # Inbound port interfaces
-│           ├── ports_outbound.go # Outbound port interfaces
-│           ├── service.go        # Application service
+│           ├── ports_outbound.go # LLMClient, ToolExecutor interfaces
+│           ├── service.go        # TaskService (observe→decide→act→update loop)
 │           ├── service_test.go   # Service tests
-│           ├── value_objects.go  # Value objects
+│           ├── value_objects.go  # AgentID, TaskID, MessageRole, TaskStatus
 │           └── value_objects_test.go # Value object tests
 ├── tools/                        # Development/build utilities (Python)
 │   ├── change_me_local_secret.py # Secret rotation for local dev
@@ -185,8 +205,8 @@ go-ddd-hex-starter/
 | Constructors | `NewXxx` | `NewIndex()`, `NewFileReader()` |
 | Methods | `PascalCase` | `CreateIndex()`, `ReadFileInfos()` |
 | Value objects | Type alias or struct | `type IndexID string` |
-| Events | `Event<Action>` | `EventFileIndexCreated` |
-| Event topics | `<context>.<snake_case_action>` | `indexing.file_index_created` |
+| Events | `Event<Action>` | `EventFileIndexCreated`, `EventTaskStarted` |
+| Event topics | `<context>.<snake_case_action>` | `indexing.file_index_created`, `agent.task_completed` |
 | HTTP handlers | `Http<Type><Resource>` | `HttpViewIndex`, `HttpViewLogin` |
 | Test functions | `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>` | `Test_Index_Hash_With_No_FileInfos_Should_Return_Valid_Hash` |
 
@@ -216,6 +236,7 @@ go-ddd-hex-starter/
 - **Integration tests:** Located in `cmd/<app>/*_test.go`, use `httptest.NewServer`
 - **Coverage:** Run with `just test`, generates `coverage.pprof` (Go) and runs Python tests
 - **Test coverage:** Target ~65% coverage; domain layer should have higher coverage
+- **Integration tests:** Use `//go:build integration` tag for tests requiring external services (e.g., LM Studio)
 
 ### 5.5 Formatting & Linting
 
@@ -267,6 +288,15 @@ go-ddd-hex-starter/
 - **File-based:** `resource.NewJsonFileAccess` for simple JSON persistence
 - **Database:** Implement domain repository interface in `internal/adapters/outbound/`
 
+### LLM Integration (Agent Pattern)
+
+- **Interface:** `agent.LLMClient` defines the port for LLM communication
+- **Adapter:** `outbound.LMStudioClient` implements the interface using OpenAI-compatible API
+- **Tool execution:** `agent.ToolExecutor` interface for agent tool calls
+- **Configuration:** `LM_STUDIO_URL` and `LM_STUDIO_MODEL` environment variables
+- **Agent loop:** TaskService orchestrates observe → decide → act → update cycle
+- **Events:** Agent domain publishes `TaskStarted`, `TaskCompleted`, `TaskFailed`, `ToolCallExecuted` events
+
 ### HTTP Patterns
 
 - **Router:** Standard `http.ServeMux` with pattern matching
@@ -299,8 +329,8 @@ go-ddd-hex-starter/
 
 ### What Is Designed to Be Customized
 
-- **Bounded contexts:** Replace/extend `internal/domain/indexing/` with your domains
-- **Adapters:** Add new inbound (HTTP, gRPC, CLI) and outbound (DB, APIs) adapters
+- **Bounded contexts:** Replace/extend `internal/domain/indexing/` and `internal/domain/agent/` with your domains
+- **Adapters:** Add new inbound (HTTP, gRPC, CLI) and outbound (DB, APIs, LLM) adapters
 - **Events:** Define domain-specific events in each bounded context
 - **Templates/UI:** Replace `cmd/server/assets/` with your frontend
 - **Configuration:** Update `.env.example` with your application's settings
@@ -320,8 +350,8 @@ go-ddd-hex-starter/
    cp .env.example .env
    cp .keycloak.json.example .keycloak.json
    ```
-6. **Remove example domain** (`internal/domain/indexing/`) or use as reference
-7. **Create your bounded contexts** following the indexing example structure
+6. **Remove example domains** (`internal/domain/indexing/`, `internal/domain/agent/`) or use as reference
+7. **Create your bounded contexts** following the indexing or agent example structure
 8. **Implement adapters** for your infrastructure (databases, external APIs)
 9. **Update routes** in `internal/adapters/inbound/router.go`
 10. **Update tests** to cover your domain logic
@@ -341,6 +371,7 @@ All commands are defined in `.justfile` and executed via `just`:
 | `just fmt` | Format Go code with golangci-lint formatters |
 | `just lint` | Run golangci-lint to check code quality (0 issues required) |
 | `just test` (or `just t`) | Run Go unit tests with coverage + Python tests for tools |
+| `just test-integration` | Run integration tests (requires external services like LM Studio) |
 | `just serve` | Run HTTP server locally (requires Kafka/Keycloak) |
 | `just run` | Run CLI demo locally |
 | `just profile` | Generate PGO profiles via benchmarks |
@@ -353,6 +384,9 @@ go test -v ./internal/...
 
 # Run tests including cmd/ (integration tests)
 go test -v ./...
+
+# Run integration tests with build tag
+go test -v -tags=integration ./internal/...
 
 # Build binaries locally
 go build -o bin/server ./cmd/server
@@ -372,6 +406,7 @@ cd tools && python3 -m unittest -v
 | Application | http://localhost:8080 |
 | Keycloak Admin | http://localhost:8180/admin (admin:admin) |
 | Kafka Broker | localhost:9092 |
+| LM Studio | http://localhost:1234 (OpenAI-compatible API) |
 
 ---
 
@@ -404,6 +439,7 @@ cd tools && python3 -m unittest -v
 - **Single OIDC provider:** Template assumes Keycloak; other providers need adapter changes
 - **File-based persistence:** Example uses JSON files; production needs proper database
 - **Local Kafka:** Development uses single-node Kafka; production needs cluster
+- **Local LLM:** Agent requires LM Studio running locally; production may need cloud LLM adapter
 
 ### Deprecated/Do Not Touch
 
@@ -426,13 +462,15 @@ cd tools && python3 -m unittest -v
 
 1. **Before major changes:** Always read this file to understand project structure
 2. **New code:** Follow directory placement rules and naming conventions exactly
-3. **New bounded context:** Use `internal/domain/indexing/` as the reference implementation
-4. **Testing:** Create tests following the `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>` pattern
-6. **Test coverage:** Ensure new code has accompanying tests; aim for ~65% overall coverage
-7. **Configuration:** Add new environment variables to `.env.example` with documentation
-8. **Events:** Define event structs in domain, serialize in adapters
-9. **Dependencies:** Prefer `cloud-native-utils` patterns; document new external libraries
-10. **Python tooling:** Add tests in `tools/*_test.py` using `unittest` module
+4. **New bounded context:** Use `internal/domain/indexing/` or `internal/domain/agent/` as reference implementations
+5. **Agent patterns:** For LLM integration, follow the agent domain's port/adapter pattern
+6. **Testing:** Create tests following the `Test_<Struct>_<Method>_With_<Condition>_Should_<Result>` pattern
+7. **Test coverage:** Ensure new code has accompanying tests; aim for ~65% overall coverage
+8. **Integration tests:** Use `//go:build integration` tag for tests requiring external services
+9. **Configuration:** Add new environment variables to `.env.example` with documentation
+10. **Events:** Define event structs in domain, serialize in adapters
+11. **Dependencies:** Prefer `cloud-native-utils` patterns; document new external libraries
+12. **Python tooling:** Add tests in `tools/*_test.py` using `unittest` module
 
 ### When Updating This File
 
