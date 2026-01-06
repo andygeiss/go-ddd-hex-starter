@@ -102,10 +102,10 @@ go-ddd-hex-starter/
 │       └── assets/           # Embedded templates and static files
 ├── internal/
 │   ├── adapters/
-│   │   ├── inbound/          # HTTP handlers, event subscribers
-│   │   └── outbound/         # Repositories, event publishers
+│   │   ├── inbound/          # HTTP handlers, event subscribers (with tests)
+│   │   └── outbound/         # Repositories, event publishers (with tests)
 │   └── domain/
-│       ├── event/            # Event interfaces
+│       ├── event/            # Event interfaces (with tests)
 │       └── indexing/         # Example bounded context (with tests)
 ├── tools/                    # Python development utilities
 │   ├── *_test.py             # Python unit tests
@@ -216,7 +216,7 @@ just test
 ```
 
 This runs:
-- Go unit tests with coverage (~65% coverage target)
+- Go unit tests with coverage (~87% coverage)
 - Python unit tests for development tools
 
 Or run tests separately:
@@ -238,10 +238,10 @@ Test_<Struct>_<Method>_With_<Condition>_Should_<Result>
 
 | Package | Coverage |
 |---------|----------|
-| `internal/domain/indexing` | ~87% |
-| `internal/adapters/inbound` | ~54% |
+| `internal/domain/indexing` | ~90% |
+| `internal/adapters/inbound` | ~87% |
 | `internal/adapters/outbound` | ~67% |
-| **Total** | **~65%** |
+| **Total** | **~87%** |
 
 ---
 

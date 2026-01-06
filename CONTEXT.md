@@ -13,7 +13,7 @@ The template includes a working example domain (`indexing`) that demonstrates fi
 | Category | Technology |
 |----------|------------|
 | **Language** | Go 1.25.5 (module: `github.com/andygeiss/go-ddd-hex-starter`) |
-| **Core Library** | `github.com/andygeiss/cloud-native-utils` v0.4.9 (logging, security, messaging, templating, resource access) |
+| **Core Library** | `github.com/andygeiss/cloud-native-utils` v0.4.10 (logging, security, messaging, templating, resource access) |
 | **Authentication** | OpenID Connect via Keycloak (`github.com/coreos/go-oidc/v3`) |
 | **Messaging** | Apache Kafka (`github.com/segmentio/kafka-go`) |
 | **Frontend** | Server-side Go templates with HTMX, vanilla CSS |
@@ -91,13 +91,20 @@ go-ddd-hex-starter/
 │   ├── adapters/                 # Hexagonal adapters layer
 │   │   ├── inbound/              # Driving adapters (HTTP, events, files)
 │   │   │   ├── router.go         # HTTP route definitions
-│   │   │   ├── http_*.go         # HTTP handlers
+│   │   │   ├── router_test.go    # Router tests
+│   │   │   ├── http_index.go     # Index HTTP handler
+│   │   │   ├── http_index_test.go # Index handler tests
+│   │   │   ├── http_login.go     # Login HTTP handler
+│   │   │   ├── http_login_test.go # Login handler tests
+│   │   │   ├── http_view.go      # View HTTP handler
+│   │   │   ├── http_view_test.go # View handler tests
 │   │   │   ├── middleware.go     # HTTP middleware
 │   │   │   ├── middleware_test.go # Middleware tests
 │   │   │   ├── event_subscriber.go # Kafka event subscription
 │   │   │   ├── event_subscriber_test.go # Subscriber tests
 │   │   │   ├── file_reader.go    # Filesystem adapter
-│   │   │   └── file_reader_test.go # File reader tests
+│   │   │   ├── file_reader_test.go # File reader tests
+│   │   │   └── testdata/         # Test assets (templates, static files)
 │   │   └── outbound/             # Driven adapters (persistence, messaging)
 │   │       ├── event_publisher.go    # Kafka event publishing
 │   │       ├── event_publisher_test.go # Publisher tests
@@ -106,24 +113,24 @@ go-ddd-hex-starter/
 │   └── domain/                   # Domain layer (pure business logic)
 │       ├── event/                # Event infrastructure interfaces
 │       │   ├── event.go          # Event interface
-│       │   ├── event_test.go     # Event interface tests
-│       │   ├── event_publisher.go
-│       │   ├── event_subscriber.go
-│       │   ├── event_factory.go
-│       │   └── event_handler.go
+│       │   ├── event_test.go     # Event tests
+│       │   ├── event_publisher.go # Publisher interface
+│       │   ├── event_subscriber.go # Subscriber interface
+│       │   ├── event_factory.go  # Factory function type
+│       │   └── event_handler.go  # Handler function type
 │       └── indexing/             # Example bounded context
 │           ├── aggregate.go      # Aggregate root
 │           ├── aggregate_test.go # Aggregate tests
 │           ├── entities.go       # Domain entities
 │           ├── entities_test.go  # Entity tests
-│           ├── value_objects.go  # Value objects
-│           ├── value_objects_test.go # Value object tests
 │           ├── events.go         # Domain events
-│           ├── events_test.go    # Domain event tests
+│           ├── events_test.go    # Event tests
 │           ├── ports_inbound.go  # Inbound port interfaces
 │           ├── ports_outbound.go # Outbound port interfaces
 │           ├── service.go        # Application service
-│           └── service_test.go   # Service tests
+│           ├── service_test.go   # Service tests
+│           ├── value_objects.go  # Value objects
+│           └── value_objects_test.go # Value object tests
 ├── tools/                        # Development/build utilities (Python)
 │   ├── change_me_local_secret.py # Secret rotation for local dev
 │   ├── change_me_local_secret_test.py # Unit tests for secret rotation

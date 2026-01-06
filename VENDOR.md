@@ -14,7 +14,7 @@ This document describes the external vendor libraries used in this project and p
 
 - **Purpose:** Core utility library providing modular, cloud-native building blocks for Go applications. This is the primary vendor dependency and should be the first choice for cross-cutting concerns.
 - **Repository:** [github.com/andygeiss/cloud-native-utils](https://github.com/andygeiss/cloud-native-utils)
-- **Version:** v0.4.9
+- **Version:** v0.4.10
 - **Documentation:** [pkg.go.dev](https://pkg.go.dev/github.com/andygeiss/cloud-native-utils)
 
 #### Key Packages
@@ -28,7 +28,7 @@ This document describes the external vendor libraries used in this project and p
 | `resource` | Generic CRUD interface with backends | `internal/adapters/outbound/file_index_repository.go`, tests |
 | `security` | OIDC, encryption, HTTP server | `cmd/server/main.go`, `internal/adapters/inbound/router.go` |
 | `service` | Context helpers, lifecycle hooks | `cmd/server/main.go`, `cmd/cli/main.go` |
-| `templating` | HTML template engine with `embed.FS` | `internal/adapters/inbound/router.go`, `http_view.go` |
+| `templating` | HTML template engine with `fs.FS` | `internal/adapters/inbound/router.go`, `http_view.go` |
 
 #### When to Use
 
@@ -43,12 +43,12 @@ This document describes the external vendor libraries used in this project and p
 | **CRUD repositories** | `resource` | `resource.NewJsonFileAccess[K, V](filename)` |
 | **Mock repositories** | `resource` | `resource.NewMockAccess[K, V]()` for tests |
 | **HTTP server setup** | `security` | `security.NewServer(mux)` with env-based config |
-| **OIDC authentication** | `security` | `security.NewServeMux(ctx, efs)` with session management |
+| **OIDC authentication** | `security` | `security.NewServeMux(ctx, efs)` with session management (accepts `fs.FS`) |
 | **Auth middleware** | `security` | `security.WithAuth(sessions, handler)` |
 | **Context with signals** | `service` | `service.Context()` for graceful shutdown |
 | **Shutdown hooks** | `service` | `service.RegisterOnContextDone(ctx, fn)` |
 | **Function wrapping** | `service` | `service.Wrap(fn)` for context-aware functions |
-| **HTML templating** | `templating` | `templating.NewEngine(efs)` with `embed.FS` |
+| **HTML templating** | `templating` | `templating.NewEngine(efs)` with `fs.FS` (use `fs.Sub()` for path remapping) |
 
 #### Integration Patterns
 
@@ -86,6 +86,7 @@ repo := resource.NewInMemoryAccess[KeyType, ValueType]()
 ```go
 import "github.com/andygeiss/cloud-native-utils/security"
 
+// efs can be embed.FS or any fs.FS implementation
 mux, sessions := security.NewServeMux(ctx, efs)
 srv := security.NewServer(mux)
 ```
@@ -96,6 +97,7 @@ srv := security.NewServer(mux)
 - **OIDC configuration:** Requires `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URL` environment variables.
 - **Kafka configuration:** Requires `KAFKA_BROKERS` and optionally `KAFKA_CONSUMER_GROUP_ID`.
 - **Server timeouts:** Configured via `SERVER_*_TIMEOUT` environment variables.
+- **fs.FS flexibility:** As of v0.4.10, `security.NewServeMux()` and `templating.NewEngine()` accept `fs.FS` instead of `embed.FS`. This enables using `fs.Sub()` to remap paths in tests (e.g., `fs.Sub(testAssets, "testdata")` to align embedded test assets with production paths).
 
 ---
 
@@ -211,9 +213,9 @@ Python scripts in `tools/` use only the standard library to avoid external depen
 | Concern | Vendor | Pattern |
 |---------|--------|---------|
 | Server creation | `cloud-native-utils/security` | `security.NewServer(mux)` |
-| Routing + sessions | `cloud-native-utils/security` | `security.NewServeMux(ctx, efs)` |
+| Routing + sessions | `cloud-native-utils/security` | `security.NewServeMux(ctx, efs)` (accepts `fs.FS`) |
 | Authentication | `cloud-native-utils/security` | `security.WithAuth(sessions, handler)` |
-| Templating | `cloud-native-utils/templating` | `templating.NewEngine(efs)` |
+| Templating | `cloud-native-utils/templating` | `templating.NewEngine(efs)` (accepts `fs.FS`) |
 | Redirects | `cloud-native-utils/redirecting` | `redirecting.Redirect(w, r, path)` |
 
 ### Messaging
