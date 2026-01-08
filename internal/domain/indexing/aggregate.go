@@ -13,19 +13,19 @@ import (
 // It is responsible for consistency and integrity of the index data.
 // This ensures that the Index is a valid and consistent representation of the indexed files.
 type Index struct {
-	ID        IndexID
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	ID        IndexID
 	FileInfos []FileInfo
 }
 
 // NewIndex creates a new Index instance with the given ID and fileInfos.
 func NewIndex(id IndexID, fileInfos []FileInfo) Index {
 	return Index{
-		ID:        id,
-		FileInfos: fileInfos,
 		CreatedAt: time.Now(),
 		UpdatedAt: time.Now(),
+		ID:        id,
+		FileInfos: fileInfos,
 	}
 }
 

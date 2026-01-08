@@ -9,9 +9,9 @@ import (
 
 // HttpViewManifestResponse specifies the view data for the PWA manifest.
 type HttpViewManifestResponse struct {
+	Description string
 	Name        string
 	ShortName   string
-	Description string
 }
 
 // HttpViewManifest defines an HTTP handler function for rendering the PWA manifest.json.
@@ -23,9 +23,9 @@ func HttpViewManifest(e *templating.Engine) http.HandlerFunc {
 
 	// Create the Data Object (DTO) once at startup.
 	data := HttpViewManifestResponse{
+		Description: description,
 		Name:        appName,
 		ShortName:   appName,
-		Description: description,
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
