@@ -169,17 +169,17 @@ go-ddd-hex-starter/
 
 | Command | Description |
 |---------|-------------|
-| `just setup` | Install development dependencies |
 | `just build` | Build Docker image |
-| `just up` | Start full development stack |
 | `just down` | Stop all services |
-| `just serve` | Run HTTP server locally |
+| `just fmt` | Format code |
+| `just lint` | Run linter |
+| `just profile` | Generate CPU profile for PGO |
 | `just run` | Run CLI application locally |
+| `just serve` | Run HTTP server locally |
+| `just setup` | Install development dependencies |
 | `just test` | Run unit tests with coverage |
 | `just test-integration` | Run integration tests |
-| `just lint` | Run linter |
-| `just fmt` | Format code |
-| `just profile` | Generate CPU profile for PGO |
+| `just up` | Start full development stack |
 
 ### Running Locally (without Docker)
 
@@ -258,11 +258,11 @@ Configuration is managed via environment variables. Copy `.env.example` to `.env
 | `APP_NAME` | Display name for UI and PWA | `Template` |
 | `APP_SHORTNAME` | Docker image/container name | `template` |
 | `APP_VERSION` | Version for PWA cache busting | `1.0.0` |
-| `PORT` | HTTP server port | `8080` |
 | `KAFKA_BROKERS` | Kafka broker addresses | `localhost:9092` |
-| `OIDC_ISSUER` | Keycloak realm URL | `http://localhost:8180/realms/local` |
 | `OIDC_CLIENT_ID` | OIDC client ID | `template` |
 | `OIDC_CLIENT_SECRET` | OIDC client secret | Auto-generated |
+| `OIDC_ISSUER` | Keycloak realm URL | `http://localhost:8180/realms/local` |
+| `PORT` | HTTP server port | `8080` |
 
 See `.env.example` for the complete list with documentation.
 

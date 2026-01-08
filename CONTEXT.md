@@ -378,17 +378,17 @@ The primary external dependency. Use its utilities instead of rolling custom imp
 
 | Command | Description |
 |---------|-------------|
-| `just setup` | Install dev dependencies (brew: docker-compose, golangci-lint, just, podman) |
 | `just build` | Build Docker image with Podman |
-| `just up` | Generate secrets, build image, start Keycloak + Kafka + app |
 | `just down` | Stop and remove all Docker Compose services |
-| `just serve` | Run HTTP server locally (requires KAFKA_BROKERS=localhost:9092) |
+| `just fmt` | Format code with golangci-lint formatters |
+| `just lint` | Run golangci-lint |
+| `just profile` | Generate CPU profile for PGO |
 | `just run` | Run CLI application locally |
+| `just serve` | Run HTTP server locally (requires KAFKA_BROKERS=localhost:9092) |
+| `just setup` | Install dev dependencies (brew: docker-compose, golangci-lint, just, podman) |
 | `just test` | Run unit tests with coverage (Go + Python) |
 | `just test-integration` | Run integration tests (requires external services) |
-| `just lint` | Run golangci-lint |
-| `just fmt` | Format code with golangci-lint formatters |
-| `just profile` | Generate CPU profile for PGO |
+| `just up` | Generate secrets, build image, start Keycloak + Kafka + app |
 
 ### Environment Selection
 
