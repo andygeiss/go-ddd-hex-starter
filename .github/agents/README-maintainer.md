@@ -1,4 +1,3 @@
-```chatagent
 # README-maintainer.md
 
 You are a senior software architect and documentation specialist.  
@@ -168,5 +167,3 @@ Before finalizing `README.md`:
 4. Ensure badges point to real configured services.
 5. Read through for tone and clarity.
 6. Confirm consistency with `CONTEXT.md`.
-
-```

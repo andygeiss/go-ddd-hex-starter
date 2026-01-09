@@ -120,13 +120,11 @@ go-ddd-hex-starter/
 │   │
 │   └── domain/                   # Domain layer (business logic)
 │       └── indexing/             # Indexing bounded context
-│           ├── aggregate.go      # Index aggregate root (with Search capability)
-│           ├── entities.go       # FileInfo entity
-│           ├── events.go         # EventFileIndexCreated
-│           ├── ports_inbound.go  # FileReader interface
-│           ├── ports_outbound.go # IndexRepository interface
-│           ├── service.go        # IndexingService (CreateIndex, SearchFiles)
-│           └── value_objects.go  # IndexID, SearchResult
+│           ├── index.go          # Index aggregate + FileInfo + IndexID + SearchResult
+│           ├── index_test.go     # Tests for index-related types
+│           ├── ports.go          # FileReader, IndexRepository interfaces
+│           ├── service.go        # IndexingService + EventFileIndexCreated
+│           └── service_test.go   # Tests for service + events
 │
 ├── tools/                        # Build and dev tooling (Python scripts)
 │   ├── change_me_local_secret.py # Generates per-machine OIDC secrets
@@ -150,11 +148,11 @@ go-ddd-hex-starter/
 
 | What | Where | Notes |
 |------|-------|-------|
-| New bounded context | `internal/domain/{context}/` | Include aggregate, entities, value objects, service, ports, events |
+| New bounded context | `internal/domain/{context}/` | Include `<aggregate>.go`, `service.go`, `ports.go` |
 | Inbound adapter | `internal/adapters/inbound/` | Implement domain port interfaces; prefix HTTP handlers with `http_` |
 | Outbound adapter | `internal/adapters/outbound/` | Implement domain port interfaces |
-| Domain ports | `internal/domain/{context}/ports_*.go` | `ports_inbound.go` for driving ports, `ports_outbound.go` for driven ports |
-| Domain events | `internal/domain/{context}/events.go` | Use builder pattern with `With*` methods |
+| Domain ports | `internal/domain/{context}/ports.go` | All interfaces (inbound + outbound) in one file |
+| Domain events | `internal/domain/{context}/service.go` | Events live with the service that publishes them |
 | Test fixtures | `internal/adapters/inbound/testdata/` | Or colocated `*_test.go` files |
 | Entry point | `cmd/{app}/main.go` | Wire adapters and start services |
 | Embedded assets | `cmd/{app}/assets/` | Use `//go:embed assets` directive |
@@ -172,7 +170,29 @@ go-ddd-hex-starter/
 - Use `context.Context` for cancellation and timeouts across all layers
 - Services do not create contexts; they receive and forward them
 
-### 5.2 Naming
+### 5.2 File Organization (Go stdlib idioms)
+
+Structure Go files by **functionality**, not by DDD element type. This follows Go standard library conventions.
+
+**Domain package structure:**
+
+| File | Contents | Rationale |
+|------|----------|-----------|
+| `<aggregate>.go` | Aggregate root + entities + value objects + methods | Self-contained; all supporting types live with the aggregate |
+| `service.go` | Domain service + events it publishes | Service orchestrates use cases and knows which events to emit |
+| `ports.go` | Inbound + outbound interfaces | Clear "API surface" for adapters to implement |
+
+**Guiding principles:**
+1. **Locality** — Open one file to understand a complete concept
+2. **Go idioms** — Match stdlib organization (e.g., `net/http` keeps `Request`, `Response`, `Header` together)
+3. **Scalability** — Split files only when they exceed ~300-400 lines
+4. **Discoverability** — `ports.go` is the entry point for adapter implementations
+
+**Anti-patterns to avoid:**
+- One type per file — Creates excessive fragmentation
+- Separate files for value objects, entities, events — DDD theater; doesn't improve comprehension
+
+### 5.3 Naming
 
 | Element | Convention | Example |
 |---------|------------|---------|
@@ -183,12 +203,12 @@ go-ddd-hex-starter/
 | Methods | PascalCase | `CreateIndex`, `RunTask` |
 | Variables | camelCase | `fileInfos`, `serverSessions` |
 | Constants | PascalCase | `TaskStatusPending`, `RoleUser` |
-| Test files | `*_test.go` | `aggregate_test.go` |
+| Test files | `*_test.go` | `index_test.go`, `service_test.go` |
 | HTTP handlers | `Http*` or `HttpView*` | `HttpViewIndex`, `HttpViewLogin` |
 | Domain events | `Event*` prefix | `EventTaskStarted`, `EventFileIndexCreated` |
 | Event topics | `{context}.{action}` | `indexing.file_index_created` |
 
-### 5.3 Error Handling & Logging
+### 5.4 Error Handling & Logging
 
 **Error Handling:**
 - Return errors; do not panic (except truly unrecoverable situations)
@@ -203,12 +223,12 @@ go-ddd-hex-starter/
 - Use structured logging: `logger.Info("message", "key", value)`
 - Log levels: `Info` for operations, `Error` for failures, `Debug` for tracing
 
-### 5.4 Testing
+### 5.5 Testing
 
 **Framework:** Standard `testing` package
 
 **Organization:**
-- Unit tests colocated with source: `aggregate.go` → `aggregate_test.go`
+- Unit tests colocated with source: `index.go` → `index_test.go`, `service.go` → `service_test.go`
 - Integration tests tagged: `//go:build integration`
 - Test fixtures in `testdata/` directories
 
@@ -224,7 +244,7 @@ just test              # Unit tests + coverage
 just test-integration  # Integration tests (requires LM Studio, etc.)
 ```
 
-### 5.5 Formatting & Linting
+### 5.6 Formatting & Linting
 
 **Tools:**
 - `golangci-lint` for linting and formatting

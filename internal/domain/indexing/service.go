@@ -6,6 +6,40 @@ import (
 	"github.com/andygeiss/cloud-native-utils/event"
 )
 
+// Event topics for the indexing domain.
+const (
+	EventTopicFileIndexCreated = "indexing.file_index_created"
+)
+
+// EventFileIndexCreated represents a file index created event.
+type EventFileIndexCreated struct {
+	IndexID   IndexID `json:"index_id"`
+	FileCount int     `json:"file_count"`
+}
+
+// NewEventFileIndexCreated creates a new EventFileIndexCreated instance.
+// Use the builder methods to set the fields.
+func NewEventFileIndexCreated() *EventFileIndexCreated {
+	return &EventFileIndexCreated{}
+}
+
+// Topic returns the topic for the event.
+func (e *EventFileIndexCreated) Topic() string {
+	return EventTopicFileIndexCreated
+}
+
+// WithFileCount sets the FileCount field.
+func (e *EventFileIndexCreated) WithFileCount(count int) *EventFileIndexCreated {
+	e.FileCount = count
+	return e
+}
+
+// WithIndexID sets the IndexID field.
+func (e *EventFileIndexCreated) WithIndexID(id IndexID) *EventFileIndexCreated {
+	e.IndexID = id
+	return e
+}
+
 // The services in a domain context are responsible for managing the workflows.
 // They are responsible for creating and managing aggregates.
 // They are also responsible for interacting with inbound and outbound adapters.
