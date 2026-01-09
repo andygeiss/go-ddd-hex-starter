@@ -290,7 +290,7 @@ internal/domain/indexing/
 
 ## 10. Refactoring guidelines
 
-When refactoring Go code, follow the rules defined in `.github/agents/refactor.md`. The key principles are:
+When refactoring Go code, apply the following rules to maintain consistency and optimize performance.
 
 ### 10.1 Ordering rules (alphabetical sorting)
 

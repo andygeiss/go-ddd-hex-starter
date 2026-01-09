@@ -1,0 +1,296 @@
+<!doctype html>
+<!--
+    HTML Design Philosophy:
+    - Keep HTML clean and minimal. No inline styles or inline JavaScript.
+    - Define all styles as reusable CSS classes (see theme.css and styles.css).
+    - Compose components by combining utility classes (.flex-center, .gap-4, etc.).
+    - No JavaScript in <script> tags within HTML files.
+    - For dynamic pages: use templating.Engine (Go templates) with HTMX for interactivity.
+    - This ensures clean separation of concerns and maintainable, predictable code.
+-->
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <!-- PWA support -->
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <link rel="manifest" href="/manifest.json" />
+        <!-- Favicons -->
+        <link rel="icon" href="/static/img/favicon.ico" />
+        <link
+            rel="apple-touch-icon"
+            sizes="192x192"
+            href="/static/img/icon-192.png"
+        />
+        <link
+            rel="apple-touch-icon"
+            sizes="512x512"
+            href="/static/img/icon-512.png"
+        />
+        <link
+            rel="icon"
+            type="image/png"
+            sizes="192x192"
+            href="/static/img/icon-192.png"
+        />
+        <meta name="theme-color" content="#ffffff" />
+        <title>Glassmorphism UI</title>
+        <!-- Layer 1: Reset / foundation -->
+        <link rel="stylesheet" href="/static/css/base.css" />
+        <!-- Layer 2: Design tokens -->
+        <link rel="stylesheet" href="/static/css/theme.css" />
+        <!-- Layer 3: Components / layout -->
+        <link rel="stylesheet" href="/static/css/styles.css" />
+    </head>
+    <body>
+        <!-- Demonstrates body styles (layout + typography) -->
+        <header class="nav">
+            <div class="nav__brand">Glassmorphism UI</div>
+
+            <!-- Mobile nav toggle: .nav__toggle, .nav__toggle-label, .nav__hamburger -->
+            <input type="checkbox" id="nav-toggle" class="nav__toggle" />
+            <label
+                for="nav-toggle"
+                class="nav__toggle-label"
+                aria-label="Toggle navigation"
+            >
+                <span class="nav__hamburger"></span>
+            </label>
+
+            <!-- Desktop + mobile navigation links: .nav__links, .nav__link -->
+            <nav class="nav__links">
+                <a href="#hero" class="nav__link">Home</a>
+                <a href="#cards" class="nav__link">Cards</a>
+                <a href="#forms" class="nav__link">Forms</a>
+                <a href="#utilities" class="nav__link">Utilities</a>
+            </nav>
+        </header>
+
+        <div class="container">
+            <main>
+                <!-- HERO SECTION: Frosted glass aesthetics -->
+                <section id="hero" class="flex-column gap-4 py-4">
+                    <div class="flex-center">
+                        <img
+                            src="/static/img/icon-192.png"
+                            alt="Logo"
+                            width="96"
+                            height="96"
+                        />
+                    </div>
+                    <h1 class="text-center">Glassmorphism UI</h1>
+                    <p class="text-center">
+                        Frosted glass effects with vibrant gradients. Blur,
+                        transparency, and soft glowing accents.
+                    </p>
+
+                    <div class="flex-center gap-4">
+                        <!-- Buttons: .btn + size / variant modifiers -->
+                        <button class="btn btn-primary btn-lg">Primary</button>
+                        <button class="btn btn-outline btn-lg">Outline</button>
+                        <button class="btn btn-ghost btn-lg">Ghost</button>
+                    </div>
+
+                    <div class="flex-center gap-2 mt-4">
+                        <button class="btn btn-secondary btn-sm">
+                            Secondary
+                        </button>
+                        <button class="btn btn-primary btn-sm">Primary</button>
+                    </div>
+                </section>
+
+                <!-- CARDS SECTION: Glass cards with blur -->
+                <section id="cards" class="my-4">
+                    <h2 class="mb-4">Glass Cards</h2>
+
+                    <div class="flex-column gap-4">
+                        <article class="card">
+                            <header class="card__header">
+                                <h3>✦ Frosted Glass</h3>
+                                <p class="text-success">
+                                    Backdrop blur creates depth.
+                                </p>
+                            </header>
+                            <div class="card__body">
+                                <p>
+                                    Cards use backdrop-filter blur with
+                                    semi-transparent backgrounds. The glass
+                                    effect lets the gradient shine through.
+                                </p>
+                            </div>
+                            <footer class="card__footer">
+                                <button class="btn btn-outline btn-sm">
+                                    Dismiss
+                                </button>
+                                <button class="btn btn-primary btn-sm">
+                                    View
+                                </button>
+                            </footer>
+                        </article>
+
+                        <article class="card">
+                            <header class="card__header">
+                                <h3>✦ Glow Effects</h3>
+                                <p class="text-error">
+                                    Vibrant accents with soft shadows.
+                                </p>
+                            </header>
+                            <div class="card__body">
+                                <p>
+                                    Status colors glow with
+                                    <span class="text-error">error</span>,
+                                    <span class="text-success">success</span>,
+                                    states. Hover effects add subtle animations.
+                                </p>
+                            </div>
+                            <footer class="card__footer">
+                                <button class="btn btn-secondary btn-sm">
+                                    Retry
+                                </button>
+                            </footer>
+                        </article>
+                    </div>
+                </section>
+
+                <!-- FORMS SECTION: Glass input fields -->
+                <section id="forms" class="my-4">
+                    <h2 class="mb-4">Glass Forms</h2>
+
+                    <form class="flex-column gap-4">
+                        <div class="form-group">
+                            <label for="email" class="form-label"
+                                >Email address</label
+                            >
+                            <input
+                                id="email"
+                                type="email"
+                                class="form-input"
+                                placeholder="you@example.com"
+                                aria-describedby="email-help email-error"
+                            />
+                            <span id="email-help" class="sr-only"
+                                >We will never share your email.</span
+                            >
+                            <p id="email-error" class="text-error mt-4">
+                                Please enter a valid email.
+                            </p>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password" class="form-label"
+                                >Password</label
+                            >
+                            <input
+                                id="password"
+                                type="password"
+                                class="form-input"
+                                placeholder="••••••••"
+                            />
+                        </div>
+
+                        <div class="form-group">
+                            <label for="message" class="form-label"
+                                >Message</label
+                            >
+                            <textarea
+                                id="message"
+                                rows="4"
+                                class="form-input"
+                                placeholder="Tell us more..."
+                            ></textarea>
+                        </div>
+
+                        <div class="flex-center gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary">
+                                Submit
+                            </button>
+                            <button type="reset" class="btn btn-ghost">
+                                Reset
+                            </button>
+                        </div>
+                    </form>
+                </section>
+
+                <!-- UTILITIES SECTION: Layout helpers -->
+                <section id="utilities" class="my-4">
+                    <h2 class="mb-4">Utilities</h2>
+
+                    <div class="card p-4">
+                        <div class="flex-center flex-column gap-2">
+                            <p class="text-center">
+                                Flex utilities: <code>.flex-center</code>,
+                                <code>.flex-column</code>, <code>.gap-2</code>,
+                                <code>.p-4</code>, and
+                                <code>.text-center</code>.
+                            </p>
+                            <div class="flex-center gap-1">
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-1</span
+                                >
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-2</span
+                                >
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-4</span
+                                >
+                                <span class="btn btn-outline btn-sm"
+                                    >gap-6</span
+                                >
+                            </div>
+                            <p class="mt-4 mb-4">
+                                Spacing: <code>.mt-4</code>, <code>.mb-4</code>,
+                                <code>.my-4</code>, <code>.px-4</code>,
+                                <code>.py-4</code>.
+                            </p>
+                            <div class="px-4 py-4 btn btn-secondary btn-sm">
+                                Padded container
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
+        </div>
+
+        <!-- Mobile thumb zone: .action-bar, .action-bar__item -->
+        <nav class="action-bar" aria-label="Quick actions">
+            <a href="#hero" class="action-bar__item">Home</a>
+            <a href="#cards" class="action-bar__item">Cards</a>
+            <a href="#forms" class="action-bar__item">Forms</a>
+            <a href="#utilities" class="action-bar__item">Utils</a>
+        </nav>
+
+        <!-- Base layer examples -->
+        <section class="container my-4">
+            <h2 class="mb-4">Base Layer</h2>
+
+            <ul>
+                <li><a href="#hero">Links have glow on hover</a></li>
+                <li>
+                    <button class="btn btn-outline btn-sm">
+                        Glass buttons
+                    </button>
+                </li>
+            </ul>
+
+            <table class="mt-4">
+                <tr>
+                    <th>Element</th>
+                    <th>Description</th>
+                </tr>
+                <tr>
+                    <td>Tables</td>
+                    <td>Glass background with blur effect</td>
+                </tr>
+                <tr>
+                    <td>Code</td>
+                    <td>Frosted backdrop with pink accent</td>
+                </tr>
+            </table>
+        </section>
+
+        <footer class="container my-4 text-center">
+            <p>Glassmorphism UI</p>
+        </footer>
+    </body>
+</html>
