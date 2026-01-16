@@ -7,17 +7,17 @@ import (
 	"github.com/andygeiss/cloud-native-utils/resource"
 )
 
-// Outbound Ports - Repositories
+// Outbound Ports - Repositories.
 
-// ReservationRepository provides CRUD operations for reservations
+// ReservationRepository provides CRUD operations for reservations.
 type ReservationRepository resource.Access[ReservationID, Reservation]
 
-// PaymentRepository provides CRUD operations for payments
+// PaymentRepository provides CRUD operations for payments.
 type PaymentRepository resource.Access[PaymentID, Payment]
 
-// Outbound Ports - External Services
+// Outbound Ports - External Services.
 
-// PaymentGateway handles payment processing with external providers
+// PaymentGateway handles payment processing with external providers.
 type PaymentGateway interface {
 	// Authorize holds funds without capturing them
 	Authorize(ctx context.Context, payment *Payment) (transactionID string, err error)
@@ -27,7 +27,7 @@ type PaymentGateway interface {
 	Refund(ctx context.Context, transactionID string, amount Money) error
 }
 
-// AvailabilityChecker validates room availability for reservations
+// AvailabilityChecker validates room availability for reservations.
 type AvailabilityChecker interface {
 	// IsRoomAvailable checks if a room is available for the given date range
 	IsRoomAvailable(ctx context.Context, roomID RoomID, dateRange DateRange) (bool, error)
@@ -35,7 +35,7 @@ type AvailabilityChecker interface {
 	GetOverlappingReservations(ctx context.Context, roomID RoomID, dateRange DateRange) ([]*Reservation, error)
 }
 
-// NotificationService handles sending notifications to guests
+// NotificationService handles sending notifications to guests.
 type NotificationService interface {
 	// SendReservationConfirmation sends a confirmation email to the guest
 	SendReservationConfirmation(ctx context.Context, reservation *Reservation) error
@@ -45,5 +45,5 @@ type NotificationService interface {
 	SendPaymentReceipt(ctx context.Context, payment *Payment) error
 }
 
-// EventPublisher publishes domain events
+// EventPublisher publishes domain events.
 type EventPublisher event.EventPublisher

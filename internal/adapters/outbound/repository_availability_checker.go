@@ -7,19 +7,19 @@ import (
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
 )
 
-// RepositoryAvailabilityChecker implements AvailabilityChecker by querying the reservation repository
+// RepositoryAvailabilityChecker implements AvailabilityChecker by querying the reservation repository.
 type RepositoryAvailabilityChecker struct {
 	reservationRepo booking.ReservationRepository
 }
 
-// NewRepositoryAvailabilityChecker creates a new availability checker
+// NewRepositoryAvailabilityChecker creates a new availability checker.
 func NewRepositoryAvailabilityChecker(repo booking.ReservationRepository) *RepositoryAvailabilityChecker {
 	return &RepositoryAvailabilityChecker{
 		reservationRepo: repo,
 	}
 }
 
-// IsRoomAvailable checks if a room is available for the given date range
+// IsRoomAvailable checks if a room is available for the given date range.
 func (c *RepositoryAvailabilityChecker) IsRoomAvailable(
 	ctx context.Context,
 	roomID booking.RoomID,
@@ -34,7 +34,7 @@ func (c *RepositoryAvailabilityChecker) IsRoomAvailable(
 	return len(overlapping) == 0, nil
 }
 
-// GetOverlappingReservations returns all reservations that overlap with the given date range
+// GetOverlappingReservations returns all reservations that overlap with the given date range.
 func (c *RepositoryAvailabilityChecker) GetOverlappingReservations(
 	ctx context.Context,
 	roomID booking.RoomID,

@@ -5,16 +5,16 @@ import (
 	"fmt"
 )
 
-// BookingOrchestrationService coordinates the complete booking saga workflow
+// BookingOrchestrationService coordinates the complete booking saga workflow.
 // It orchestrates reservation creation, payment authorization/capture, and confirmation
-// with proper compensation logic on failures
+// with proper compensation logic on failures.
 type BookingOrchestrationService struct {
 	reservationService  *ReservationService
 	paymentService      *PaymentService
 	notificationService NotificationService
 }
 
-// NewBookingOrchestrationService creates a new orchestration service
+// NewBookingOrchestrationService creates a new orchestration service.
 func NewBookingOrchestrationService(
 	reservationSvc *ReservationService,
 	paymentSvc *PaymentService,
@@ -27,9 +27,7 @@ func NewBookingOrchestrationService(
 	}
 }
 
-// CompleteBooking orchestrates the full booking workflow with compensation
-// Workflow: Create Reservation (pending) → Authorize Payment → Capture Payment → Confirm Reservation → Send Notification
-// Compensation: On failure, rolls back previous steps
+// CompleteBooking orchestrates the full booking workflow with compensation.
 func (s *BookingOrchestrationService) CompleteBooking(
 	ctx context.Context,
 	reservationID ReservationID,
@@ -41,106 +39,104 @@ func (s *BookingOrchestrationService) CompleteBooking(
 	guests []GuestInfo,
 	paymentMethod string,
 ) (*Reservation, error) {
-	// Step 1: Create reservation (pending status)
-	reservation, err := s.reservationService.CreateReservation(
-		ctx,
-		reservationID,
-		guestID,
-		roomID,
-		dateRange,
-		amount,
-		guests,
-	)
+	reservation, err := s.createReservationStep(ctx, reservationID, guestID, roomID, dateRange, amount, guests)
 	if err != nil {
-		return nil, fmt.Errorf("step 1 failed (create reservation): %w", err)
+		return nil, err
 	}
 
-	// Step 2: Authorize payment
-	payment, err := s.paymentService.AuthorizePayment(
-		ctx,
-		paymentID,
-		reservationID,
-		amount,
-		paymentMethod,
-	)
+	payment, err := s.authorizePaymentStep(ctx, paymentID, reservationID, amount, paymentMethod)
 	if err != nil {
-		// Compensation: Cancel reservation
-		cancelErr := s.reservationService.CancelReservation(
-			ctx,
-			reservationID,
-			"payment_authorization_failed",
-		)
-		if cancelErr != nil {
-			return nil, fmt.Errorf("step 2 failed (authorize payment) and compensation failed: %w (original error: %v)", cancelErr, err)
-		}
-		return nil, fmt.Errorf("step 2 failed (authorize payment): %w", err)
+		return nil, err
 	}
 
-	// Step 3: Capture payment
-	if err := s.paymentService.CapturePayment(ctx, payment.ID); err != nil {
-		// Compensation: Cancel reservation (payment authorization will expire)
-		cancelErr := s.reservationService.CancelReservation(
-			ctx,
-			reservationID,
-			"payment_capture_failed",
-		)
-		if cancelErr != nil {
-			return nil, fmt.Errorf("step 3 failed (capture payment) and compensation failed: %w (original error: %v)", cancelErr, err)
-		}
-		return nil, fmt.Errorf("step 3 failed (capture payment): %w", err)
+	if err := s.capturePaymentStep(ctx, payment.ID, reservationID); err != nil {
+		return nil, err
 	}
 
-	// Step 4: Confirm reservation
-	if err := s.reservationService.ConfirmReservation(ctx, reservationID); err != nil {
-		// Compensation: Refund payment and cancel reservation
-		refundErr := s.paymentService.RefundPayment(ctx, payment.ID)
-		cancelErr := s.reservationService.CancelReservation(
-			ctx,
-			reservationID,
-			"confirmation_failed",
-		)
-
-		if refundErr != nil || cancelErr != nil {
-			return nil, fmt.Errorf("step 4 failed (confirm reservation) and compensation failed (refund: %v, cancel: %v): %w", refundErr, cancelErr, err)
-		}
-		return nil, fmt.Errorf("step 4 failed (confirm reservation): %w", err)
+	if err := s.confirmReservationStep(ctx, reservationID, payment.ID); err != nil {
+		return nil, err
 	}
 
-	// Step 5: Send confirmation notification (best-effort, don't fail on error)
 	_ = s.notificationService.SendReservationConfirmation(ctx, reservation)
 
-	// Reload reservation to get updated status
-	confirmedReservation, err := s.reservationService.GetReservation(ctx, reservationID)
-	if err != nil {
-		return nil, fmt.Errorf("failed to reload confirmed reservation: %w", err)
-	}
-
-	return confirmedReservation, nil
+	return s.reservationService.GetReservation(ctx, reservationID)
 }
 
-// CancelBookingWithRefund cancels a reservation and refunds the payment if applicable
+// CancelBookingWithRefund cancels a reservation and refunds the payment if applicable.
 func (s *BookingOrchestrationService) CancelBookingWithRefund(
 	ctx context.Context,
 	reservationID ReservationID,
 	reason string,
 ) error {
-	// 1. Get reservation
 	reservation, err := s.reservationService.GetReservation(ctx, reservationID)
 	if err != nil {
 		return fmt.Errorf("failed to get reservation: %w", err)
 	}
 
-	// 2. Cancel reservation (validates business rules)
 	if err := s.reservationService.CancelReservation(ctx, reservationID, reason); err != nil {
 		return fmt.Errorf("failed to cancel reservation: %w", err)
 	}
 
-	// 3. Find and refund payment if it was captured
-	// Note: In a real system, you'd query payments by reservation ID
-	// For now, we'll skip this step as it requires a query method
-
-	// 4. Send cancellation notification (best-effort)
 	_ = s.notificationService.SendCancellationNotice(ctx, reservation, reason)
 
+	return nil
+}
+
+func (s *BookingOrchestrationService) createReservationStep(
+	ctx context.Context,
+	reservationID ReservationID,
+	guestID GuestID,
+	roomID RoomID,
+	dateRange DateRange,
+	amount Money,
+	guests []GuestInfo,
+) (*Reservation, error) {
+	reservation, err := s.reservationService.CreateReservation(ctx, reservationID, guestID, roomID, dateRange, amount, guests)
+	if err != nil {
+		return nil, fmt.Errorf("step 1 failed (create reservation): %w", err)
+	}
+	return reservation, nil
+}
+
+func (s *BookingOrchestrationService) authorizePaymentStep(
+	ctx context.Context,
+	paymentID PaymentID,
+	reservationID ReservationID,
+	amount Money,
+	paymentMethod string,
+) (*Payment, error) {
+	payment, err := s.paymentService.AuthorizePayment(ctx, paymentID, reservationID, amount, paymentMethod)
+	if err != nil {
+		cancelErr := s.reservationService.CancelReservation(ctx, reservationID, "payment_authorization_failed")
+		if cancelErr != nil {
+			return nil, fmt.Errorf("step 2 failed (authorize payment) and compensation failed: %w (original error: %w)", cancelErr, err)
+		}
+		return nil, fmt.Errorf("step 2 failed (authorize payment): %w", err)
+	}
+	return payment, nil
+}
+
+func (s *BookingOrchestrationService) capturePaymentStep(ctx context.Context, paymentID PaymentID, reservationID ReservationID) error {
+	captureErr := s.paymentService.CapturePayment(ctx, paymentID)
+	if captureErr != nil {
+		cancelErr := s.reservationService.CancelReservation(ctx, reservationID, "payment_capture_failed")
+		if cancelErr != nil {
+			return fmt.Errorf("step 3 failed (capture payment) and compensation failed: %w (original error: %w)", cancelErr, captureErr)
+		}
+		return fmt.Errorf("step 3 failed (capture payment): %w", captureErr)
+	}
+	return nil
+}
+
+func (s *BookingOrchestrationService) confirmReservationStep(ctx context.Context, reservationID ReservationID, paymentID PaymentID) error {
+	confirmErr := s.reservationService.ConfirmReservation(ctx, reservationID)
+	if confirmErr != nil {
+		refundErr := s.paymentService.RefundPayment(ctx, paymentID)
+		cancelErr := s.reservationService.CancelReservation(ctx, reservationID, "confirmation_failed")
+		if refundErr != nil || cancelErr != nil {
+			return fmt.Errorf("step 4 failed (confirm reservation) and compensation failed (refund: %w, cancel: %w): %w", refundErr, cancelErr, confirmErr)
+		}
+		return fmt.Errorf("step 4 failed (confirm reservation): %w", confirmErr)
+	}
 	return nil
 }

@@ -2,31 +2,31 @@ package outbound
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"log/slog"
 
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
 )
 
-// MockNotificationService implements NotificationService by logging to console
+// MockNotificationService implements NotificationService by logging to console.
 type MockNotificationService struct {
 	logger *slog.Logger
 }
 
-// NewMockNotificationService creates a new mock notification service
+// NewMockNotificationService creates a new mock notification service.
 func NewMockNotificationService(logger *slog.Logger) *MockNotificationService {
 	return &MockNotificationService{
 		logger: logger,
 	}
 }
 
-// SendReservationConfirmation logs a confirmation message
+// SendReservationConfirmation logs a confirmation message.
 func (s *MockNotificationService) SendReservationConfirmation(
 	ctx context.Context,
 	reservation *booking.Reservation,
 ) error {
 	if len(reservation.Guests) == 0 {
-		return fmt.Errorf("no guests found in reservation")
+		return errors.New("no guests found in reservation")
 	}
 
 	primaryGuest := reservation.Guests[0]
@@ -44,14 +44,14 @@ func (s *MockNotificationService) SendReservationConfirmation(
 	return nil
 }
 
-// SendCancellationNotice logs a cancellation message
+// SendCancellationNotice logs a cancellation message.
 func (s *MockNotificationService) SendCancellationNotice(
 	ctx context.Context,
 	reservation *booking.Reservation,
 	reason string,
 ) error {
 	if len(reservation.Guests) == 0 {
-		return fmt.Errorf("no guests found in reservation")
+		return errors.New("no guests found in reservation")
 	}
 
 	primaryGuest := reservation.Guests[0]
@@ -66,7 +66,7 @@ func (s *MockNotificationService) SendCancellationNotice(
 	return nil
 }
 
-// SendPaymentReceipt logs a payment receipt message
+// SendPaymentReceipt logs a payment receipt message.
 func (s *MockNotificationService) SendPaymentReceipt(
 	ctx context.Context,
 	payment *booking.Payment,

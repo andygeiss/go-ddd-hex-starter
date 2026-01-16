@@ -8,7 +8,7 @@ import (
 	"github.com/andygeiss/cloud-native-utils/event"
 )
 
-// Event topics for reservation domain events
+// Event topics for reservation domain events.
 const (
 	EventTopicReservationCreated   = "booking.reservation_created"
 	EventTopicReservationConfirmed = "booking.reservation_confirmed"
@@ -17,7 +17,7 @@ const (
 	EventTopicReservationCancelled = "booking.reservation_cancelled"
 )
 
-// EventReservationCreated represents a reservation created event
+// EventReservationCreated represents a reservation created event.
 type EventReservationCreated struct {
 	ReservationID ReservationID `json:"reservation_id"`
 	GuestID       GuestID       `json:"guest_id"`
@@ -27,123 +27,123 @@ type EventReservationCreated struct {
 	TotalAmount   Money         `json:"total_amount"`
 }
 
-// NewEventReservationCreated creates a new EventReservationCreated instance
+// NewEventReservationCreated creates a new EventReservationCreated instance.
 func NewEventReservationCreated() *EventReservationCreated {
 	return &EventReservationCreated{}
 }
 
-// Topic returns the topic for the event
+// Topic returns the topic for the event.
 func (e *EventReservationCreated) Topic() string {
 	return EventTopicReservationCreated
 }
 
-// WithReservationID sets the ReservationID field
+// WithReservationID sets the ReservationID field.
 func (e *EventReservationCreated) WithReservationID(id ReservationID) *EventReservationCreated {
 	e.ReservationID = id
 	return e
 }
 
-// WithGuestID sets the GuestID field
+// WithGuestID sets the GuestID field.
 func (e *EventReservationCreated) WithGuestID(id GuestID) *EventReservationCreated {
 	e.GuestID = id
 	return e
 }
 
-// WithRoomID sets the RoomID field
+// WithRoomID sets the RoomID field.
 func (e *EventReservationCreated) WithRoomID(id RoomID) *EventReservationCreated {
 	e.RoomID = id
 	return e
 }
 
-// WithCheckIn sets the CheckIn field
+// WithCheckIn sets the CheckIn field.
 func (e *EventReservationCreated) WithCheckIn(checkIn time.Time) *EventReservationCreated {
 	e.CheckIn = checkIn
 	return e
 }
 
-// WithCheckOut sets the CheckOut field
+// WithCheckOut sets the CheckOut field.
 func (e *EventReservationCreated) WithCheckOut(checkOut time.Time) *EventReservationCreated {
 	e.CheckOut = checkOut
 	return e
 }
 
-// WithTotalAmount sets the TotalAmount field
+// WithTotalAmount sets the TotalAmount field.
 func (e *EventReservationCreated) WithTotalAmount(amount Money) *EventReservationCreated {
 	e.TotalAmount = amount
 	return e
 }
 
-// EventReservationConfirmed represents a reservation confirmed event
+// EventReservationConfirmed represents a reservation confirmed event.
 type EventReservationConfirmed struct {
-	ReservationID ReservationID `json:"reservation_id"`
 	ConfirmedAt   time.Time     `json:"confirmed_at"`
+	ReservationID ReservationID `json:"reservation_id"`
 }
 
-// NewEventReservationConfirmed creates a new EventReservationConfirmed instance
+// NewEventReservationConfirmed creates a new EventReservationConfirmed instance.
 func NewEventReservationConfirmed() *EventReservationConfirmed {
 	return &EventReservationConfirmed{}
 }
 
-// Topic returns the topic for the event
+// Topic returns the topic for the event.
 func (e *EventReservationConfirmed) Topic() string {
 	return EventTopicReservationConfirmed
 }
 
-// WithReservationID sets the ReservationID field
+// WithReservationID sets the ReservationID field.
 func (e *EventReservationConfirmed) WithReservationID(id ReservationID) *EventReservationConfirmed {
 	e.ReservationID = id
 	return e
 }
 
-// WithConfirmedAt sets the ConfirmedAt field
+// WithConfirmedAt sets the ConfirmedAt field.
 func (e *EventReservationConfirmed) WithConfirmedAt(t time.Time) *EventReservationConfirmed {
 	e.ConfirmedAt = t
 	return e
 }
 
-// EventReservationCancelled represents a reservation cancelled event
+// EventReservationCancelled represents a reservation cancelled event.
 type EventReservationCancelled struct {
+	CancelledAt   time.Time     `json:"cancelled_at"`
 	ReservationID ReservationID `json:"reservation_id"`
 	Reason        string        `json:"reason"`
-	CancelledAt   time.Time     `json:"cancelled_at"`
 }
 
-// NewEventReservationCancelled creates a new EventReservationCancelled instance
+// NewEventReservationCancelled creates a new EventReservationCancelled instance.
 func NewEventReservationCancelled() *EventReservationCancelled {
 	return &EventReservationCancelled{}
 }
 
-// Topic returns the topic for the event
+// Topic returns the topic for the event.
 func (e *EventReservationCancelled) Topic() string {
 	return EventTopicReservationCancelled
 }
 
-// WithReservationID sets the ReservationID field
+// WithReservationID sets the ReservationID field.
 func (e *EventReservationCancelled) WithReservationID(id ReservationID) *EventReservationCancelled {
 	e.ReservationID = id
 	return e
 }
 
-// WithReason sets the Reason field
+// WithReason sets the Reason field.
 func (e *EventReservationCancelled) WithReason(reason string) *EventReservationCancelled {
 	e.Reason = reason
 	return e
 }
 
-// WithCancelledAt sets the CancelledAt field
+// WithCancelledAt sets the CancelledAt field.
 func (e *EventReservationCancelled) WithCancelledAt(t time.Time) *EventReservationCancelled {
 	e.CancelledAt = t
 	return e
 }
 
-// ReservationService handles reservation workflows
+// ReservationService handles reservation workflows.
 type ReservationService struct {
 	reservationRepo     ReservationRepository
 	availabilityChecker AvailabilityChecker
 	publisher           event.EventPublisher
 }
 
-// NewReservationService creates a new ReservationService with dependencies
+// NewReservationService creates a new ReservationService with dependencies.
 func NewReservationService(
 	repo ReservationRepository,
 	checker AvailabilityChecker,
@@ -156,7 +156,7 @@ func NewReservationService(
 	}
 }
 
-// CreateReservation creates a new pending reservation after checking availability
+// CreateReservation creates a new pending reservation after checking availability.
 func (s *ReservationService) CreateReservation(
 	ctx context.Context,
 	id ReservationID,
@@ -202,7 +202,7 @@ func (s *ReservationService) CreateReservation(
 	return reservation, nil
 }
 
-// ConfirmReservation transitions a reservation to confirmed status
+// ConfirmReservation transitions a reservation to confirmed status.
 func (s *ReservationService) ConfirmReservation(ctx context.Context, id ReservationID) error {
 	// 1. Load reservation from repository
 	reservation, err := s.reservationRepo.Read(ctx, id)
@@ -232,7 +232,7 @@ func (s *ReservationService) ConfirmReservation(ctx context.Context, id Reservat
 	return nil
 }
 
-// CancelReservation cancels a reservation with business rule validation
+// CancelReservation cancels a reservation with business rule validation.
 func (s *ReservationService) CancelReservation(ctx context.Context, id ReservationID, reason string) error {
 	// 1. Load reservation from repository
 	reservation, err := s.reservationRepo.Read(ctx, id)
@@ -263,7 +263,7 @@ func (s *ReservationService) CancelReservation(ctx context.Context, id Reservati
 	return nil
 }
 
-// GetReservation retrieves a reservation by ID
+// GetReservation retrieves a reservation by ID.
 func (s *ReservationService) GetReservation(ctx context.Context, id ReservationID) (*Reservation, error) {
 	reservation, err := s.reservationRepo.Read(ctx, id)
 	if err != nil {
@@ -272,7 +272,7 @@ func (s *ReservationService) GetReservation(ctx context.Context, id ReservationI
 	return reservation, nil
 }
 
-// ListReservationsByGuest retrieves all reservations for a guest
+// ListReservationsByGuest retrieves all reservations for a guest.
 func (s *ReservationService) ListReservationsByGuest(ctx context.Context, guestID GuestID) ([]*Reservation, error) {
 	// List all reservations
 	allReservations, err := s.reservationRepo.ReadAll(ctx)

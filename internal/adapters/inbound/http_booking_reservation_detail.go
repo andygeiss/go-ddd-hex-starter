@@ -26,11 +26,11 @@ type ReservationDetailView struct {
 	Status             string
 	StatusClass        string
 	TotalAmount        string
-	Nights             int
 	CreatedAt          string
 	CancellationReason string
-	CanCancel          bool
 	Guests             []GuestInfoView
+	Nights             int
+	CanCancel          bool
 }
 
 // HttpViewReservationDetailResponse specifies the view data for the reservation detail.
@@ -41,6 +41,32 @@ type HttpViewReservationDetailResponse struct {
 	Reservation ReservationDetailView
 }
 
+func buildReservationDetailView(reservation *booking.Reservation) ReservationDetailView {
+	guests := make([]GuestInfoView, 0, len(reservation.Guests))
+	for _, g := range reservation.Guests {
+		guests = append(guests, GuestInfoView{
+			Name:        g.Name,
+			Email:       g.Email,
+			PhoneNumber: g.PhoneNumber,
+		})
+	}
+
+	return ReservationDetailView{
+		Guests:             guests,
+		ID:                 string(reservation.ID),
+		RoomID:             string(reservation.RoomID),
+		CheckIn:            reservation.DateRange.CheckIn.Format("2006-01-02"),
+		CheckOut:           reservation.DateRange.CheckOut.Format("2006-01-02"),
+		Status:             string(reservation.Status),
+		StatusClass:        reservationStatusClass(reservation.Status),
+		TotalAmount:        reservation.TotalAmount.FormatAmount(),
+		CreatedAt:          reservation.CreatedAt.Format("2006-01-02 15:04"),
+		CancellationReason: reservation.CancellationReason,
+		Nights:             reservation.Nights(),
+		CanCancel:          reservation.CanBeCancelled(),
+	}
+}
+
 // HttpViewReservationDetail defines an HTTP handler function for rendering a single reservation.
 func HttpViewReservationDetail(e *templating.Engine, reservationService *booking.ReservationService) http.HandlerFunc {
 	appName := os.Getenv("APP_NAME")
@@ -48,7 +74,6 @@ func HttpViewReservationDetail(e *templating.Engine, reservationService *booking
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		// Check authentication
 		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
 		email, _ := ctx.Value(security.ContextEmail).(string)
 		if sessionID == "" || email == "" {
@@ -56,57 +81,28 @@ func HttpViewReservationDetail(e *templating.Engine, reservationService *booking
 			return
 		}
 
-		// Get reservation ID from path
 		reservationID := r.PathValue("id")
 		if reservationID == "" {
 			http.Error(w, "Reservation ID required", http.StatusBadRequest)
 			return
 		}
 
-		// Fetch reservation
 		reservation, err := reservationService.GetReservation(ctx, booking.ReservationID(reservationID))
 		if err != nil {
 			http.Error(w, "Reservation not found", http.StatusNotFound)
 			return
 		}
 
-		// Verify the reservation belongs to the current user
 		if string(reservation.GuestID) != email {
 			http.Error(w, "Access denied", http.StatusForbidden)
 			return
-		}
-
-		// Convert guests to view model
-		guests := make([]GuestInfoView, 0, len(reservation.Guests))
-		for _, g := range reservation.Guests {
-			guests = append(guests, GuestInfoView{
-				Name:        g.Name,
-				Email:       g.Email,
-				PhoneNumber: g.PhoneNumber,
-			})
-		}
-
-		// Build view model
-		detail := ReservationDetailView{
-			ID:                 string(reservation.ID),
-			RoomID:             string(reservation.RoomID),
-			CheckIn:            reservation.DateRange.CheckIn.Format("2006-01-02"),
-			CheckOut:           reservation.DateRange.CheckOut.Format("2006-01-02"),
-			Status:             string(reservation.Status),
-			StatusClass:        reservationStatusClass(reservation.Status),
-			TotalAmount:        reservation.TotalAmount.FormatAmount(),
-			Nights:             reservation.Nights(),
-			CreatedAt:          reservation.CreatedAt.Format("2006-01-02 15:04"),
-			CancellationReason: reservation.CancellationReason,
-			CanCancel:          reservation.CanBeCancelled(),
-			Guests:             guests,
 		}
 
 		data := HttpViewReservationDetailResponse{
 			AppName:     appName,
 			Title:       appName + " - Reservation " + reservationID,
 			SessionID:   sessionID,
-			Reservation: detail,
+			Reservation: buildReservationDetailView(reservation),
 		}
 
 		HttpView(e, "reservation_detail", data)(w, r)

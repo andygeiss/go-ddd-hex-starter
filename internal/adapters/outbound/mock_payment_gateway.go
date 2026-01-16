@@ -2,20 +2,22 @@ package outbound
 
 import (
 	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
-	"math/rand"
+	"math/big"
 
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
 )
 
-// MockPaymentGateway simulates a payment gateway for testing and demonstration
+// MockPaymentGateway simulates a payment gateway for testing and demonstration.
 type MockPaymentGateway struct {
-	ShouldFail      bool
-	FailureRate     float64 // 0.0 to 1.0, probability of random failures
-	transactions    map[string]booking.Money
+	transactions map[string]booking.Money
+	FailureRate  float64 // 0.0 to 1.0, probability of random failures
+	ShouldFail   bool
 }
 
-// NewMockPaymentGateway creates a new mock payment gateway
+// NewMockPaymentGateway creates a new mock payment gateway.
 func NewMockPaymentGateway() *MockPaymentGateway {
 	return &MockPaymentGateway{
 		ShouldFail:   false,
@@ -24,76 +26,73 @@ func NewMockPaymentGateway() *MockPaymentGateway {
 	}
 }
 
-// Authorize simulates authorizing a payment
+// cryptoRandFloat64 returns a random float64 in [0.0, 1.0) using crypto/rand.
+func cryptoRandFloat64() float64 {
+	maxVal := big.NewInt(1 << 53)
+	n, err := rand.Int(rand.Reader, maxVal)
+	if err != nil {
+		return 0
+	}
+	return float64(n.Int64()) / float64(1<<53)
+}
+
+// Authorize simulates authorizing a payment.
 func (g *MockPaymentGateway) Authorize(ctx context.Context, payment *booking.Payment) (string, error) {
-	// Check for forced or random failure
-	if g.ShouldFail || (g.FailureRate > 0 && rand.Float64() < g.FailureRate) {
-		return "", fmt.Errorf("payment authorization failed: insufficient funds")
+	if g.ShouldFail || (g.FailureRate > 0 && cryptoRandFloat64() < g.FailureRate) {
+		return "", errors.New("payment authorization failed: insufficient funds")
 	}
 
-	// Generate mock transaction ID
 	transactionID := fmt.Sprintf("txn_%s_%d", payment.ID, payment.Amount.Amount)
-
-	// Store authorized amount
 	g.transactions[transactionID] = payment.Amount
 
 	return transactionID, nil
 }
 
-// Capture simulates capturing an authorized payment
+// Capture simulates capturing an authorized payment.
 func (g *MockPaymentGateway) Capture(ctx context.Context, transactionID string, amount booking.Money) error {
-	// Check for forced or random failure
-	if g.ShouldFail || (g.FailureRate > 0 && rand.Float64() < g.FailureRate) {
-		return fmt.Errorf("payment capture failed: gateway timeout")
+	if g.ShouldFail || (g.FailureRate > 0 && cryptoRandFloat64() < g.FailureRate) {
+		return errors.New("payment capture failed: gateway timeout")
 	}
 
-	// Verify transaction exists
 	authorizedAmount, exists := g.transactions[transactionID]
 	if !exists {
 		return fmt.Errorf("transaction %s not found", transactionID)
 	}
 
-	// Verify amount matches
 	if authorizedAmount.Amount != amount.Amount || authorizedAmount.Currency != amount.Currency {
 		return fmt.Errorf("capture amount mismatch: authorized %v, requested %v", authorizedAmount, amount)
 	}
 
-	// Mark as captured (in a real implementation, this would update external state)
-	// For mock purposes, we just keep it in the map
-
 	return nil
 }
 
-// Refund simulates refunding a captured payment
+// Refund simulates refunding a captured payment.
 func (g *MockPaymentGateway) Refund(ctx context.Context, transactionID string, amount booking.Money) error {
-	// Check for forced or random failure
-	if g.ShouldFail || (g.FailureRate > 0 && rand.Float64() < g.FailureRate) {
-		return fmt.Errorf("payment refund failed: gateway error")
+	if g.ShouldFail || (g.FailureRate > 0 && cryptoRandFloat64() < g.FailureRate) {
+		return errors.New("payment refund failed: gateway error")
 	}
 
-	// Verify transaction exists
 	_, exists := g.transactions[transactionID]
 	if !exists {
 		return fmt.Errorf("transaction %s not found", transactionID)
 	}
 
-	// Remove from transactions (simulate refund)
 	delete(g.transactions, transactionID)
 
 	return nil
 }
 
-// SetShouldFail configures the mock to always fail (for testing error paths)
+// SetShouldFail configures the mock to always fail (for testing error paths).
 func (g *MockPaymentGateway) SetShouldFail(shouldFail bool) {
 	g.ShouldFail = shouldFail
 }
 
-// SetFailureRate sets the probability of random failures (0.0 to 1.0)
+// SetFailureRate sets the probability of random failures (0.0 to 1.0).
 func (g *MockPaymentGateway) SetFailureRate(rate float64) {
 	g.FailureRate = rate
 }
 
-// Reset clears all transaction state
+// Reset clears all transaction state.
 func (g *MockPaymentGateway) Reset() {
 	g.transactions = make(map[string]booking.Money)
 	g.ShouldFail = false

@@ -1,31 +1,34 @@
-package booking
+package booking_test
 
 import (
+	"errors"
 	"testing"
+
+	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
 )
 
 // Test Payment Creation
 
 func Test_PaymentID_With_String_Value_Should_Be_Assignable(t *testing.T) {
-	var id PaymentID = "pay-123"
+	var id booking.PaymentID = "pay-123"
 	if id != "pay-123" {
 		t.Errorf("expected pay-123, got %s", id)
 	}
 }
 
 func Test_NewPayment_Should_Create_With_Pending_Status(t *testing.T) {
-	payment := NewPayment(
+	payment := booking.NewPayment(
 		"pay-001",
 		"res-001",
-		NewMoney(30000, "USD"),
+		booking.NewMoney(30000, "USD"),
 		"credit_card",
 	)
 
 	if payment == nil {
 		t.Fatal("expected payment, got nil")
 	}
-	if payment.Status != PaymentPending {
-		t.Errorf("expected status %s, got %s", PaymentPending, payment.Status)
+	if payment.Status != booking.PaymentPending {
+		t.Errorf("expected status %s, got %s", booking.PaymentPending, payment.Status)
 	}
 	if len(payment.Attempts) != 0 {
 		t.Errorf("expected 0 attempts, got %d", len(payment.Attempts))
@@ -35,7 +38,7 @@ func Test_NewPayment_Should_Create_With_Pending_Status(t *testing.T) {
 // Test Payment Authorization
 
 func Test_Payment_Authorize_From_Pending_Should_Change_Status(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	transactionID := "txn-12345"
 
 	err := payment.Authorize(transactionID)
@@ -43,8 +46,8 @@ func Test_Payment_Authorize_From_Pending_Should_Change_Status(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if payment.Status != PaymentAuthorized {
-		t.Errorf("expected status %s, got %s", PaymentAuthorized, payment.Status)
+	if payment.Status != booking.PaymentAuthorized {
+		t.Errorf("expected status %s, got %s", booking.PaymentAuthorized, payment.Status)
 	}
 	if payment.TransactionID != transactionID {
 		t.Errorf("expected transaction ID %s, got %s", transactionID, payment.TransactionID)
@@ -55,18 +58,18 @@ func Test_Payment_Authorize_From_Pending_Should_Change_Status(t *testing.T) {
 }
 
 func Test_Payment_Authorize_Already_Authorized_Should_Return_Error(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 
 	err := payment.Authorize("txn-67890")
 
-	if err != ErrAlreadyAuthorized {
+	if !errors.Is(err, booking.ErrAlreadyAuthorized) {
 		t.Errorf("expected ErrAlreadyAuthorized, got %v", err)
 	}
 }
 
 func Test_Payment_Authorize_From_Captured_Should_Return_Error(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 	_ = payment.Capture()
 
@@ -78,7 +81,7 @@ func Test_Payment_Authorize_From_Captured_Should_Return_Error(t *testing.T) {
 }
 
 func Test_Payment_Authorize_From_Failed_Should_Succeed(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Fail("insufficient_funds", "Insufficient funds")
 
 	err := payment.Authorize("txn-12345")
@@ -86,15 +89,15 @@ func Test_Payment_Authorize_From_Failed_Should_Succeed(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error for retry, got %v", err)
 	}
-	if payment.Status != PaymentAuthorized {
-		t.Errorf("expected status %s, got %s", PaymentAuthorized, payment.Status)
+	if payment.Status != booking.PaymentAuthorized {
+		t.Errorf("expected status %s, got %s", booking.PaymentAuthorized, payment.Status)
 	}
 }
 
 // Test Payment Capture
 
 func Test_Payment_Capture_From_Authorized_Should_Change_Status(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 
 	err := payment.Capture()
@@ -102,29 +105,29 @@ func Test_Payment_Capture_From_Authorized_Should_Change_Status(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if payment.Status != PaymentCaptured {
-		t.Errorf("expected status %s, got %s", PaymentCaptured, payment.Status)
+	if payment.Status != booking.PaymentCaptured {
+		t.Errorf("expected status %s, got %s", booking.PaymentCaptured, payment.Status)
 	}
 }
 
 func Test_Payment_Capture_Without_Authorization_Should_Return_Error(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 
 	err := payment.Capture()
 
-	if err != ErrNotAuthorized {
+	if !errors.Is(err, booking.ErrNotAuthorized) {
 		t.Errorf("expected ErrNotAuthorized, got %v", err)
 	}
 }
 
 func Test_Payment_Capture_Already_Captured_Should_Return_Error(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 	_ = payment.Capture()
 
 	err := payment.Capture()
 
-	if err != ErrAlreadyCaptured {
+	if !errors.Is(err, booking.ErrAlreadyCaptured) {
 		t.Errorf("expected ErrAlreadyCaptured, got %v", err)
 	}
 }
@@ -132,7 +135,7 @@ func Test_Payment_Capture_Already_Captured_Should_Return_Error(t *testing.T) {
 // Test Payment Failure
 
 func Test_Payment_Fail_From_Pending_Should_Change_Status(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	errorCode := "card_declined"
 	errorMsg := "Card was declined"
 
@@ -141,8 +144,8 @@ func Test_Payment_Fail_From_Pending_Should_Change_Status(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if payment.Status != PaymentFailed {
-		t.Errorf("expected status %s, got %s", PaymentFailed, payment.Status)
+	if payment.Status != booking.PaymentFailed {
+		t.Errorf("expected status %s, got %s", booking.PaymentFailed, payment.Status)
 	}
 	if len(payment.Attempts) != 1 {
 		t.Errorf("expected 1 attempt, got %d", len(payment.Attempts))
@@ -156,7 +159,7 @@ func Test_Payment_Fail_From_Pending_Should_Change_Status(t *testing.T) {
 }
 
 func Test_Payment_Fail_From_Authorized_Should_Change_Status(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 
 	err := payment.Fail("timeout", "Gateway timeout")
@@ -164,13 +167,13 @@ func Test_Payment_Fail_From_Authorized_Should_Change_Status(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if payment.Status != PaymentFailed {
-		t.Errorf("expected status %s, got %s", PaymentFailed, payment.Status)
+	if payment.Status != booking.PaymentFailed {
+		t.Errorf("expected status %s, got %s", booking.PaymentFailed, payment.Status)
 	}
 }
 
 func Test_Payment_Fail_From_Captured_Should_Return_Error(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 	_ = payment.Capture()
 
@@ -184,7 +187,7 @@ func Test_Payment_Fail_From_Captured_Should_Return_Error(t *testing.T) {
 // Test Payment Refund
 
 func Test_Payment_Refund_From_Captured_Should_Change_Status(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 	_ = payment.Capture()
 
@@ -193,31 +196,31 @@ func Test_Payment_Refund_From_Captured_Should_Change_Status(t *testing.T) {
 	if err != nil {
 		t.Errorf("expected no error, got %v", err)
 	}
-	if payment.Status != PaymentRefunded {
-		t.Errorf("expected status %s, got %s", PaymentRefunded, payment.Status)
+	if payment.Status != booking.PaymentRefunded {
+		t.Errorf("expected status %s, got %s", booking.PaymentRefunded, payment.Status)
 	}
 }
 
 func Test_Payment_Refund_Without_Capture_Should_Return_Error(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 
 	err := payment.Refund()
 
-	if err != ErrCannotRefund {
+	if !errors.Is(err, booking.ErrCannotRefund) {
 		t.Errorf("expected ErrCannotRefund, got %v", err)
 	}
 }
 
 func Test_Payment_Refund_Already_Refunded_Should_Return_Error(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 	_ = payment.Capture()
 	_ = payment.Refund()
 
 	err := payment.Refund()
 
-	if err != ErrAlreadyRefunded {
+	if !errors.Is(err, booking.ErrAlreadyRefunded) {
 		t.Errorf("expected ErrAlreadyRefunded, got %v", err)
 	}
 }
@@ -225,7 +228,7 @@ func Test_Payment_Refund_Already_Refunded_Should_Return_Error(t *testing.T) {
 // Test Helper Methods
 
 func Test_Payment_IsSuccessful_With_Captured_Payment_Should_Return_True(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 	_ = payment.Capture()
 
@@ -235,7 +238,7 @@ func Test_Payment_IsSuccessful_With_Captured_Payment_Should_Return_True(t *testi
 }
 
 func Test_Payment_IsSuccessful_With_Pending_Payment_Should_Return_False(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 
 	if payment.IsSuccessful() {
 		t.Error("expected IsSuccessful to return false for pending payment")
@@ -243,7 +246,7 @@ func Test_Payment_IsSuccessful_With_Pending_Payment_Should_Return_False(t *testi
 }
 
 func Test_Payment_CanBeRetried_With_Failed_Payment_Should_Return_True(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Fail("card_declined", "Card declined")
 
 	if !payment.CanBeRetried() {
@@ -252,7 +255,7 @@ func Test_Payment_CanBeRetried_With_Failed_Payment_Should_Return_True(t *testing
 }
 
 func Test_Payment_CanBeRetried_With_Captured_Payment_Should_Return_False(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 	_ = payment.Authorize("txn-12345")
 	_ = payment.Capture()
 
@@ -262,7 +265,7 @@ func Test_Payment_CanBeRetried_With_Captured_Payment_Should_Return_False(t *test
 }
 
 func Test_Payment_CanBeRetried_After_3_Failed_Attempts_Should_Return_False(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 
 	// Fail 3 times
 	_ = payment.Fail("error1", "First failure")
@@ -279,7 +282,7 @@ func Test_Payment_CanBeRetried_After_3_Failed_Attempts_Should_Return_False(t *te
 // Test Payment Attempts Tracking
 
 func Test_Payment_Attempts_Should_Track_History(t *testing.T) {
-	payment := NewPayment("pay-001", "res-001", NewMoney(30000, "USD"), "credit_card")
+	payment := booking.NewPayment("pay-001", "res-001", booking.NewMoney(30000, "USD"), "credit_card")
 
 	_ = payment.Fail("card_declined", "Card declined")
 	_ = payment.Authorize("txn-12345")
@@ -290,13 +293,13 @@ func Test_Payment_Attempts_Should_Track_History(t *testing.T) {
 	}
 
 	// Check attempt order
-	if payment.Attempts[0].Status != PaymentFailed {
+	if payment.Attempts[0].Status != booking.PaymentFailed {
 		t.Errorf("expected first attempt to be failed, got %s", payment.Attempts[0].Status)
 	}
-	if payment.Attempts[1].Status != PaymentAuthorized {
+	if payment.Attempts[1].Status != booking.PaymentAuthorized {
 		t.Errorf("expected second attempt to be authorized, got %s", payment.Attempts[1].Status)
 	}
-	if payment.Attempts[2].Status != PaymentCaptured {
+	if payment.Attempts[2].Status != booking.PaymentCaptured {
 		t.Errorf("expected third attempt to be captured, got %s", payment.Attempts[2].Status)
 	}
 }

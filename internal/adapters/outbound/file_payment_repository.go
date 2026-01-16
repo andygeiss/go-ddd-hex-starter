@@ -5,12 +5,12 @@ import (
 	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
 )
 
-// FilePaymentRepository implements the PaymentRepository port using JSON file storage
+// FilePaymentRepository implements the PaymentRepository port using JSON file storage.
 type FilePaymentRepository struct {
 	resource.JsonFileAccess[booking.PaymentID, booking.Payment]
 }
 
-// NewFilePaymentRepository creates a new file-based payment repository
+// NewFilePaymentRepository creates a new file-based payment repository.
 func NewFilePaymentRepository(filename string) booking.PaymentRepository {
 	return resource.NewJsonFileAccess[booking.PaymentID, booking.Payment](filename)
 }
