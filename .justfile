@@ -96,23 +96,6 @@ profile:
     @go tool pprof -svg cpuprofile.pprof > cpuprofile.svg
     @echo "Profile written to cpuprofile.pprof"
     @echo "SVG written to cpuprofile.svg"
- 
-# ======================================
-# Run - Execute CLI application locally
-# ======================================
-# Builds the image then runs the CLI binary from cmd/cli/main.go
-
-run:
-    @go run ./cmd/cli/main.go
-
-# ======================================
-# Serve - Run HTTP server locally
-# ======================================
-# Starts the HTTP server from cmd/server/main.go
-# Server listens on the configured port (see .env or config)
-
-serve:
-    @go run ./cmd/server/main.go
 
 # ======================================
 # Setup - Install dependencies

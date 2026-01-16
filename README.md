@@ -11,7 +11,7 @@
 [![Codacy Badge](https://app.codacy.com/project/badge/Grade/f9f01632dff14c448dbd4688abbd04e8)](https://app.codacy.com/gh/andygeiss/go-ddd-hex-starter/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 [![Codacy Badge](https://app.codacy.com/project/badge/Coverage/f9f01632dff14c448dbd4688abbd04e8)](https://app.codacy.com/gh/andygeiss/go-ddd-hex-starter/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 
-A production-ready Go starter template demonstrating Domain-Driven Design (DDD) and Hexagonal Architecture (Ports & Adapters) patterns.
+A production-ready Go starter template demonstrating Domain-Driven Design (DDD) and Hexagonal Architecture (Ports & Adapters) patterns with a complete **Hotel Booking** domain example.
 
 <p align="center">
 <img src="https://github.com/andygeiss/go-ddd-hex-starter/blob/main/cmd/server/assets/static/img/login.png?raw=true" width="300"/>
@@ -24,6 +24,7 @@ A production-ready Go starter template demonstrating Domain-Driven Design (DDD) 
 - [Overview](#overview)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
+- [Domain Model](#domain-model)
 - [Project Structure](#project-structure)
 - [Getting Started](#getting-started)
 - [Usage](#usage)
@@ -41,23 +42,25 @@ This repository provides a reference implementation for structuring Go applicati
 
 - Organize code using **Hexagonal Architecture** (Ports & Adapters)
 - Apply **Domain-Driven Design** tactical patterns (aggregates, entities, value objects, domain events)
+- Implement the **Saga Pattern** for distributed workflow orchestration
 - Integrate authentication via **OIDC/Keycloak**
 - Implement event-driven communication with **Apache Kafka**
 
-The template includes an `indexing` bounded context, an HTTP server with OIDC authentication, and a CLI demonstrating event-driven file indexing.
+The template includes a fully-featured **Booking** bounded context with reservations, payments, availability checking, and orchestrated workflows.
 
 ---
 
 ## Key Features
 
+- **Complete Booking Domain** — Reservations, payments, availability checking, and guest management
 - **Developer Experience** — `just` task runner, golangci-lint, comprehensive test coverage
-- **Domain-Driven Design** — Aggregates, entities, value objects, services, and domain events
+- **Domain-Driven Design** — Aggregates, entities, value objects, domain services, and domain events
 - **Event Streaming** — Kafka-based pub/sub for domain events
-- **File Indexing & Search** — Index workspace files and search by filename with relevance scoring
 - **Hexagonal Architecture** — Clear separation between domain logic and infrastructure
 - **OIDC Authentication** — Keycloak integration with session management
 - **Production-Ready Docker** — Multi-stage build with PGO optimization (~5-10MB images)
 - **Progressive Web App** — Service worker, manifest, and offline support for installable web apps
+- **Saga Pattern** — Orchestrated booking workflow with compensation on failure
 
 ---
 
@@ -66,25 +69,25 @@ The template includes an `indexing` bounded context, an HTTP server with OIDC au
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                    Entry Points (cmd/)                      │
-│                   cli/main.go, server/main.go               │
+│                       server/main.go                        │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
 │                  Inbound Adapters                           │
-│   HTTP handlers, file readers, event subscribers            │
+│   HTTP handlers, event subscribers                          │
 │              internal/adapters/inbound/                     │
 └──────────────────────────┬──────────────────────────────────┘
                            │ implements ports
 ┌──────────────────────────▼──────────────────────────────────┐
 │                     Domain Layer                            │
-│   Bounded contexts: indexing/                               │
+│   Bounded contexts: booking/                                │
 │   Aggregates, entities, value objects, services, ports      │
 │                   internal/domain/                          │
 └──────────────────────────┬──────────────────────────────────┘
                            │ defines ports
 ┌──────────────────────────▼──────────────────────────────────┐
 │                  Outbound Adapters                          │
-│   Event publisher, repositories                             │
+│   Event publisher, repositories, payment gateway, notifier  │
 │              internal/adapters/outbound/                    │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -93,9 +96,96 @@ The template includes an `indexing` bounded context, an HTTP server with OIDC au
 
 | Context | Purpose |
 |---------|---------|
-| `indexing` | File indexing, search, and repository management |
+| `booking` | Hotel reservations, payments, availability, and booking orchestration |
 
-For detailed architectural documentation, see [CONTEXT.md](CONTEXT.md).
+---
+
+## Domain Model
+
+The booking domain implements a complete hotel reservation system with two aggregate roots:
+
+### Reservation Aggregate
+
+```
+Reservation (Aggregate Root)
+├── ReservationID (Value Object)
+├── GuestInfo (Entity)
+│   ├── GuestID
+│   ├── Email
+│   └── Name
+├── RoomID (Value Object)
+├── DateRange (Value Object)
+│   ├── CheckIn
+│   └── CheckOut
+├── Money (Value Object)
+│   ├── Amount
+│   └── Currency
+└── ReservationStatus (Value Object)
+    States: pending → confirmed → active → completed
+                  ↘ cancelled
+```
+
+**Business Rules:**
+- Minimum 1 night stay required
+- Check-in must be in the future
+- Cannot cancel within 24 hours of check-in
+- Same-day checkout/check-in allowed (no overlap)
+- Cancelled reservations don't block availability
+
+### Payment Aggregate
+
+```
+Payment (Aggregate Root)
+├── PaymentID (Value Object)
+├── ReservationID (links to Reservation)
+├── Money (Value Object)
+├── PaymentStatus (Value Object)
+│   States: pending → authorized → captured
+│                  ↘ failed      ↘ refunded
+└── PaymentAttempts (Entity Collection)
+    └── PaymentAttempt
+        ├── Sequence
+        ├── Status
+        ├── ErrorCode
+        └── Timestamp
+```
+
+**Business Rules:**
+- Authorization-Capture pattern (Authorize → Capture)
+- Failed payments can be retried (max 3 attempts)
+- Only captured payments can be refunded
+
+### Booking Orchestration (Saga Pattern)
+
+```
+CompleteBooking Workflow:
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ 1. Create       │───▶│ 2. Authorize    │───▶│ 3. Capture      │
+│    Reservation  │    │    Payment      │    │    Payment      │
+│    (pending)    │    │                 │    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                              │                      │
+                              ▼ (on failure)         ▼
+                       Cancel Reservation     Refund + Cancel
+                                                     │
+                                                     ▼
+                       ┌─────────────────┐    ┌─────────────────┐
+                       │ 5. Send         │◀───│ 4. Confirm      │
+                       │    Notification │    │    Reservation  │
+                       └─────────────────┘    └─────────────────┘
+```
+
+### Domain Events
+
+| Event | Trigger |
+|-------|---------|
+| `ReservationCreated` | New reservation created (pending) |
+| `ReservationConfirmed` | Reservation confirmed after payment |
+| `ReservationCancelled` | Reservation cancelled by guest or system |
+| `PaymentAuthorized` | Payment authorization successful |
+| `PaymentCaptured` | Payment captured (charged) |
+| `PaymentFailed` | Payment attempt failed |
+| `PaymentRefunded` | Payment refunded to guest |
 
 ---
 
@@ -104,18 +194,34 @@ For detailed architectural documentation, see [CONTEXT.md](CONTEXT.md).
 ```
 go-ddd-hex-starter/
 ├── .justfile                     # Task runner commands
-├── cmd/                          # Application entry points
-│   ├── cli/                      # CLI application (indexing demo)
-│   └── server/                   # HTTP server (OIDC-protected UI)
+├── cmd/server/                   # HTTP server entry point
+│   ├── main.go                   # Bootstrap: DI, server setup, lifecycle
+│   └── assets/
+│       ├── static/               # CSS, JS, images (embedded)
+│       └── templates/            # HTML templates (*.tmpl, embedded)
 ├── docker-compose.yml            # Dev stack (Keycloak, Kafka, app)
 ├── Dockerfile                    # Multi-stage production build
 ├── internal/
 │   ├── adapters/
-│   │   ├── inbound/              # HTTP handlers, file readers, subscribers
-│   │   └── outbound/             # Repositories, publishers
+│   │   ├── inbound/              # HTTP handlers, event subscribers
+│   │   │   ├── router.go         # HTTP routing & middleware
+│   │   │   ├── http_booking_*.go # Booking UI handlers
+│   │   │   └── event_subscriber.go
+│   │   └── outbound/             # Repositories, gateways, publishers
+│   │       ├── file_*_repository.go      # JSON file storage
+│   │       ├── repository_availability_checker.go
+│   │       ├── mock_payment_gateway.go   # Payment simulation
+│   │       ├── mock_notification_service.go
+│   │       └── event_publisher.go
 │   └── domain/
-│       └── indexing/             # Indexing bounded context
-└── tools/                        # Build tooling (Python scripts)
+│       └── booking/              # Booking bounded context
+│           ├── reservation.go    # Reservation aggregate
+│           ├── payment.go        # Payment aggregate
+│           ├── reservation_service.go
+│           ├── payment_service.go
+│           ├── orchestration_service.go  # Saga workflow
+│           └── ports.go          # Interface definitions
+└── reservations.json             # Runtime data (created by app)
 ```
 
 ---
@@ -125,7 +231,7 @@ go-ddd-hex-starter/
 ### Prerequisites
 
 - **Docker** and **Docker Compose** (or Podman)
-- **Go 1.25+**
+- **Go 1.24+**
 - **golangci-lint** (for linting/formatting)
 - **just** task runner
 
@@ -172,50 +278,35 @@ go-ddd-hex-starter/
 | `just fmt` | Format code |
 | `just lint` | Run linter |
 | `just profile` | Generate CPU profile for PGO |
-| `just run` | Run CLI application locally |
-| `just serve` | Run HTTP server locally |
 | `just setup` | Install development dependencies |
 | `just test` | Run unit tests with coverage |
 | `just test-integration` | Run integration tests |
 | `just up` | Start full development stack |
 
-### Running Locally (without Docker)
+### Booking Workflow
 
-To run the server locally (requires Kafka running on localhost:9092):
+Once the application is running:
 
-```bash
-# Ensure KAFKA_BROKERS is set to localhost:9092 in .env
-just serve
-```
+1. **Login** at http://localhost:8080/ui/login via Keycloak
+2. **View Reservations** at `/ui/reservations` to see your bookings
+3. **Create Reservation** at `/ui/reservations/new`:
+   - Select a room and dates
+   - Total is calculated automatically (nights × room price)
+   - Submit to create a pending reservation
+4. **View Details** at `/ui/reservations/{id}` to see reservation status
+5. **Cancel Reservation** from the detail page (if >24 hours before check-in)
 
-### Running the CLI
+### API Endpoints
 
-The CLI demonstrates event-driven file indexing with Kafka.
-
-**Basic usage:**
-```bash
-just run
-```
-
-**Example output:**
-```
-❯ main: creating index for path: /path/to/project
-❯ main: waiting for event processing to complete...
-❯ event: received EventFileIndexCreated - IndexID: /path/to/project, FileCount: 42
-❯ main: event processing completed
-❯ main: index created at 2026-01-07T10:30:00Z with 42 files
-❯ main: index hash: abc123...
-❯ main: first 5 files in index:
-  - /path/to/project/main.go (1234 bytes)
-  - /path/to/project/go.mod (567 bytes)
-  ... and 37 more files
-```
-
-The CLI:
-1. Indexes the current directory
-2. Publishes an `EventFileIndexCreated` event to Kafka
-3. Receives the event via subscription
-4. Displays a summary of the indexed files
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/ui/` | GET | Dashboard (authenticated) |
+| `/ui/login` | GET | Login page |
+| `/ui/reservations` | GET | List user's reservations |
+| `/ui/reservations/new` | GET | Reservation form |
+| `/ui/reservations` | POST | Create reservation |
+| `/ui/reservations/{id}` | GET | Reservation detail |
+| `/ui/reservations/{id}/cancel` | POST | Cancel reservation |
 
 ---
 
@@ -229,7 +320,7 @@ Run all unit tests with coverage:
 just test
 ```
 
-This runs both Go and Python tests, generating `coverage.pprof`.
+This generates `coverage.pprof` with coverage metrics.
 
 ### Integration Tests
 
@@ -244,6 +335,17 @@ just test-integration
 - Unit tests are colocated with source files (`*_test.go`)
 - Integration tests are tagged with `//go:build integration`
 - Test fixtures live in `testdata/` directories
+
+### Domain Test Coverage
+
+The domain layer includes comprehensive tests for:
+
+| Component | Test Coverage |
+|-----------|---------------|
+| **Reservation Aggregate** | State transitions, validation, overlap detection, cancellation rules |
+| **Payment Aggregate** | Authorization-capture flow, retry logic, attempt tracking |
+| **Value Objects** | Money formatting, ID types, date range calculations |
+| **Business Rules** | 24-hour cancellation policy, minimum stay, future check-in |
 
 ---
 
@@ -303,20 +405,19 @@ See `.env.example` for the complete list with documentation.
 
 ### What to Customize
 
-- Bounded contexts and domain logic
-- Static assets and templates in `cmd/*/assets/`
+- Bounded contexts and domain logic (replace `booking/` with your domain)
+- Static assets and templates in `cmd/server/assets/`
 - Environment configuration in `.env`
 - Docker Compose services as needed
-
-For detailed conventions and rules, see [CONTEXT.md](CONTEXT.md).
+- Swap mock adapters (payment gateway, notification service) for real implementations
 
 ---
 
 ## Contributing
 
-1. Follow the coding conventions documented in [CONTEXT.md](CONTEXT.md)
-2. Ensure all tests pass: `just test`
-3. Ensure code is formatted and linted: `just fmt && just lint`
+1. Ensure all tests pass: `just test`
+2. Ensure code is formatted and linted: `just fmt && just lint`
+3. Follow hexagonal architecture patterns (ports in domain, adapters in adapters/)
 4. Update documentation if architecture changes
 
 ---
