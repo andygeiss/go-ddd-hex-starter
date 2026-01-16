@@ -151,7 +151,7 @@ func Test_Route_Login_Endpoint_Should_Return_HTML_Content(t *testing.T) {
 	assert.That(t, "body must contain app name", containsString(bodyStr, "TestApp"), true)
 }
 
-func Test_Route_Session_Endpoint_Without_Valid_Session_Should_Return_200(t *testing.T) {
+func Test_Route_Session_Endpoint_Without_Valid_Session_Should_Redirect_To_Login(t *testing.T) {
 	// Arrange
 	t.Setenv("APP_NAME", "TestApp")
 	t.Setenv("APP_DESCRIPTION", "Test Description")
@@ -160,8 +160,8 @@ func Test_Route_Session_Endpoint_Without_Valid_Session_Should_Return_200(t *test
 	logger := slog.Default()
 	mux := inbound.Route(ctx, getRouterTestFS(t), logger)
 
-	// Note: Session endpoints with invalid/unknown session IDs return 200 with index page
-	// The WithAuth middleware handles session validation
+	// Note: Session endpoints with invalid/unknown session IDs redirect to login
+	// The WithAuth middleware handles session validation and redirects unauthenticated requests
 	req := httptest.NewRequest(http.MethodGet, "/ui/test-session-123/", nil)
 	rec := httptest.NewRecorder()
 
@@ -169,10 +169,10 @@ func Test_Route_Session_Endpoint_Without_Valid_Session_Should_Return_200(t *test
 	mux.ServeHTTP(rec, req)
 
 	// Assert
-	assert.That(t, "status code must be 200", rec.Code, http.StatusOK)
+	assert.That(t, "status code must be 303 (redirect)", rec.Code, http.StatusSeeOther)
 }
 
-func Test_Route_Session_Endpoint_Without_Trailing_Slash_Should_Return_200(t *testing.T) {
+func Test_Route_Session_Endpoint_Without_Trailing_Slash_Should_Redirect_To_Login(t *testing.T) {
 	// Arrange
 	t.Setenv("APP_NAME", "TestApp")
 	t.Setenv("APP_DESCRIPTION", "Test Description")
@@ -181,8 +181,8 @@ func Test_Route_Session_Endpoint_Without_Trailing_Slash_Should_Return_200(t *tes
 	logger := slog.Default()
 	mux := inbound.Route(ctx, getRouterTestFS(t), logger)
 
-	// Note: Session endpoints with invalid/unknown session IDs return 200 with index page
-	// The WithAuth middleware handles session validation
+	// Note: Session endpoints with invalid/unknown session IDs redirect to login
+	// The WithAuth middleware handles session validation and redirects unauthenticated requests
 	req := httptest.NewRequest(http.MethodGet, "/ui/test-session-123", nil)
 	rec := httptest.NewRecorder()
 
@@ -190,7 +190,7 @@ func Test_Route_Session_Endpoint_Without_Trailing_Slash_Should_Return_200(t *tes
 	mux.ServeHTTP(rec, req)
 
 	// Assert
-	assert.That(t, "status code must be 200", rec.Code, http.StatusOK)
+	assert.That(t, "status code must be 303 (redirect)", rec.Code, http.StatusSeeOther)
 }
 
 func Test_Route_Unknown_Endpoint_Should_Return_404(t *testing.T) {

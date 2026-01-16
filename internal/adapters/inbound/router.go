@@ -37,12 +37,6 @@ func Route(ctx context.Context, efs fs.FS, logger *slog.Logger) *http.ServeMux {
 	// The authenticated requests are rendered with the index template.
 	mux.HandleFunc("GET /ui/", logging.WithLogging(logger, security.WithAuth(serverSessions, HttpViewIndex(e))))
 
-	// Add session-aware index endpoints (for OIDC callback redirects).
-	// We support both /ui/{session_id}/ and /ui/{session_id} endpoints.
-	// This is important because some OIDC providers redirect to the endpoint without the trailing slash.
-	mux.HandleFunc("GET /ui/{session_id}/", logging.WithLogging(logger, security.WithAuth(serverSessions, HttpViewIndex(e))))
-	mux.HandleFunc("GET /ui/{session_id}", logging.WithLogging(logger, security.WithAuth(serverSessions, HttpViewIndex(e))))
-
 	// Add the login endpoint for the UI.
 	// This endpoint is used to forward the user to the login page of the OIDC provider.
 	mux.HandleFunc("GET /ui/login", logging.WithLogging(logger, HttpViewLogin(e)))

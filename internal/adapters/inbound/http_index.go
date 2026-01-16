@@ -33,8 +33,12 @@ func HttpViewIndex(e *templating.Engine) http.HandlerFunc {
 		ctx := r.Context()
 
 		// Check if the user is authenticated.
-		if ctx.Value(security.ContextSessionID) == nil ||
-			ctx.Value(security.ContextSessionID).(string) == "" {
+		// We check both sessionID and email because:
+		// - sessionID might exist (from cookie) even after logout
+		// - email being empty indicates the session was deleted server-side
+		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
+		email, _ := ctx.Value(security.ContextEmail).(string)
+		if sessionID == "" || email == "" {
 			redirecting.Redirect(w, r, "/ui/login")
 			return
 		}
@@ -42,10 +46,10 @@ func HttpViewIndex(e *templating.Engine) http.HandlerFunc {
 		// Add session-specific data.
 		data := HttpViewIndexResponse{
 			AppName:   appName,
-			Email:     ctx.Value(security.ContextEmail).(string),
+			Email:     email,
 			Issuer:    ctx.Value(security.ContextIssuer).(string),
 			Name:      ctx.Value(security.ContextName).(string),
-			SessionID: ctx.Value(security.ContextSessionID).(string),
+			SessionID: sessionID,
 			Subject:   ctx.Value(security.ContextSubject).(string),
 			Title:     title,
 			Verified:  ctx.Value(security.ContextVerified).(bool),

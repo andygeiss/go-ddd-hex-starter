@@ -58,6 +58,7 @@ func Test_HttpViewIndex_With_Empty_SessionID_Should_Redirect_To_Login(t *testing
 	req := httptest.NewRequest(http.MethodGet, "/ui/", nil)
 	// Add empty session ID to context
 	ctx := context.WithValue(req.Context(), security.ContextSessionID, "")
+	ctx = context.WithValue(ctx, security.ContextEmail, "")
 	req = req.WithContext(ctx)
 	rec := httptest.NewRecorder()
 
@@ -66,6 +67,35 @@ func Test_HttpViewIndex_With_Empty_SessionID_Should_Redirect_To_Login(t *testing
 
 	// Assert
 	assert.That(t, "status code must be 303 (redirect)", rec.Code, http.StatusSeeOther)
+}
+
+func Test_HttpViewIndex_With_SessionID_But_Empty_Email_Should_Redirect_To_Login(t *testing.T) {
+	// Arrange - simulates the case after logout where session is deleted but cookie remains
+	t.Setenv("APP_NAME", "TestApp")
+	t.Setenv("APP_DESCRIPTION", "Test Description")
+
+	e := templating.NewEngine(indexTestAssets)
+	e.Parse("testdata/assets/templates/*.tmpl")
+
+	handler := inbound.HttpViewIndex(e)
+	req := httptest.NewRequest(http.MethodGet, "/ui/", nil)
+	// Session ID exists (from stale cookie) but email is empty (session deleted server-side)
+	ctx := context.WithValue(req.Context(), security.ContextSessionID, "stale-session-id")
+	ctx = context.WithValue(ctx, security.ContextEmail, "")
+	ctx = context.WithValue(ctx, security.ContextIssuer, "")
+	ctx = context.WithValue(ctx, security.ContextName, "")
+	ctx = context.WithValue(ctx, security.ContextSubject, "")
+	ctx = context.WithValue(ctx, security.ContextVerified, false)
+	req = req.WithContext(ctx)
+	rec := httptest.NewRecorder()
+
+	// Act
+	handler(rec, req)
+
+	// Assert
+	assert.That(t, "status code must be 303 (redirect)", rec.Code, http.StatusSeeOther)
+	location := rec.Header().Get("Location")
+	assert.That(t, "location must redirect to login", containsString(location, "/ui/login"), true)
 }
 
 func Test_HttpViewIndex_With_Valid_Session_Should_Return_200(t *testing.T) {
@@ -128,4 +158,14 @@ func Test_HttpViewIndex_With_Valid_Session_Should_Render_User_Data(t *testing.T)
 	assert.That(t, "body must contain user email", containsString(bodyStr, "test@example.com"), true)
 	assert.That(t, "body must contain user name", containsString(bodyStr, "Test User"), true)
 	assert.That(t, "body must contain session ID", containsString(bodyStr, "test-session-123"), true)
+}
+
+// containsString is a helper function to check if a string contains a substring.
+func containsString(s, substr string) bool {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return true
+		}
+	}
+	return false
 }
