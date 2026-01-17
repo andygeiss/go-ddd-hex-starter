@@ -91,11 +91,11 @@ lint:
 
 profile:
     @echo "Running benchmarks with CPU profiling..."
-    @go test -bench=. -benchtime=10s -cpuprofile=cpuprofile.pprof ./cmd/server/...
+    @go test -bench=. -benchtime=10s -cpuprofile=.cpuprofile.pprof ./cmd/server/...
     @echo "Generating SVG visualization..."
-    @go tool pprof -svg cpuprofile.pprof > cpuprofile.svg
-    @echo "Profile written to cpuprofile.pprof"
-    @echo "SVG written to cpuprofile.svg"
+    @go tool pprof -svg .cpuprofile.pprof > .cpuprofile.svg
+    @echo "Profile written to .cpuprofile.pprof"
+    @echo "SVG written to .cpuprofile.svg"
 
 # ======================================
 # Setup - Install dependencies
@@ -155,8 +155,8 @@ up: build
 
 test:
     @echo "Running Go tests..."
-    @go test -v -coverprofile=coverage.pprof ./internal/...
-    @echo "total coverage: $(go tool cover -func=coverage.pprof | grep total | awk '{print $3}')"
+    @go test -v -coverprofile=.coverage.pprof ./internal/...
+    @echo "total coverage: $(go tool cover -func=.coverage.pprof | grep total | awk '{print $3}')"
 
 # ======================================
 # Test Integration - Run integration tests
