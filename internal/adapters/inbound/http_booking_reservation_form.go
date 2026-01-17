@@ -8,7 +8,8 @@ import (
 	"github.com/andygeiss/cloud-native-utils/redirecting"
 	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
+	"github.com/andygeiss/hotel-booking/internal/domain/shared"
 	"github.com/google/uuid"
 )
 
@@ -132,7 +133,7 @@ func parseReservationForm(r *http.Request) (*reservationFormInput, string) {
 }
 
 // HttpCreateReservation handles the POST request to create a new reservation.
-func HttpCreateReservation(e *templating.Engine, reservationService *booking.ReservationService) http.HandlerFunc {
+func HttpCreateReservation(e *templating.Engine, reservationService *reservation.Service) http.HandlerFunc {
 	appName := os.Getenv("APP_NAME")
 	title := appName + " - New Reservation"
 
@@ -153,10 +154,10 @@ func HttpCreateReservation(e *templating.Engine, reservationService *booking.Res
 		}
 
 		nights := int(input.checkOut.Sub(input.checkIn).Hours() / 24)
-		totalAmount := booking.NewMoney(getRoomPrices()[input.roomID]*int64(nights), "USD")
-		guests := []booking.GuestInfo{booking.NewGuestInfo(input.guestName, input.guestEmail, input.guestPhone)}
+		totalAmount := shared.NewMoney(getRoomPrices()[input.roomID]*int64(nights), "USD")
+		guests := []reservation.GuestInfo{reservation.NewGuestInfo(input.guestName, input.guestEmail, input.guestPhone)}
 
-		_, err := reservationService.CreateReservation(ctx, booking.ReservationID(uuid.New().String()), booking.GuestID(email), booking.RoomID(input.roomID), booking.NewDateRange(input.checkIn, input.checkOut), totalAmount, guests)
+		_, err := reservationService.CreateReservation(ctx, shared.ReservationID(uuid.New().String()), reservation.GuestID(email), reservation.RoomID(input.roomID), reservation.NewDateRange(input.checkIn, input.checkOut), totalAmount, guests)
 		if err != nil {
 			renderReservationFormWithError(e, w, r, appName, title, sessionID, err.Error(), input.guestName, input.guestEmail)
 			return

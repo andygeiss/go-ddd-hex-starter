@@ -9,13 +9,13 @@ import (
 	"github.com/andygeiss/cloud-native-utils/logging"
 	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 // Route creates a new mux with the liveness and readiness probe (/liveness, /readiness),
 // the static assets endpoint (/) and the ui endpoints (/ui).
 // The efs parameter accepts any fs.FS implementation (embed.FS, fs.Sub result, etc.).
-func Route(ctx context.Context, efs fs.FS, logger *slog.Logger, reservationService *booking.ReservationService) *http.ServeMux {
+func Route(ctx context.Context, efs fs.FS, logger *slog.Logger, reservationService *reservation.Service) *http.ServeMux {
 	// Create a new mux with liveness and readyness endpoint.
 	// Embed the assets into the mux.
 	mux, serverSessions := security.NewServeMux(ctx, efs)

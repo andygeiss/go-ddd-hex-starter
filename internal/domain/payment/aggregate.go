@@ -1,10 +1,19 @@
-package booking
+// Package payment contains the Payment bounded context.
+// It handles all payment-related domain logic including authorization,
+// capture, refund, and payment attempt tracking.
+package payment
 
 import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/andygeiss/hotel-booking/internal/domain/shared"
 )
+
+// Type aliases for shared types
+type ReservationID = shared.ReservationID
+type Money = shared.Money
 
 // PaymentID is a strongly-typed identifier for payments.
 type PaymentID string
@@ -13,20 +22,12 @@ type PaymentID string
 type PaymentStatus string
 
 const (
-	PaymentPending    PaymentStatus = "pending"
-	PaymentAuthorized PaymentStatus = "authorized"
-	PaymentCaptured   PaymentStatus = "captured"
-	PaymentFailed     PaymentStatus = "failed"
-	PaymentRefunded   PaymentStatus = "refunded"
+	StatusPending    PaymentStatus = "pending"
+	StatusAuthorized PaymentStatus = "authorized"
+	StatusCaptured   PaymentStatus = "captured"
+	StatusFailed     PaymentStatus = "failed"
+	StatusRefunded   PaymentStatus = "refunded"
 )
-
-// PaymentAttempt represents a single payment attempt (entity within Payment aggregate).
-type PaymentAttempt struct {
-	AttemptedAt time.Time
-	Status      PaymentStatus
-	ErrorCode   string
-	ErrorMsg    string
-}
 
 // Payment is the aggregate root for payment processing.
 type Payment struct {
@@ -58,7 +59,7 @@ func NewPayment(id PaymentID, reservationID ReservationID, amount Money, method 
 		ID:            id,
 		ReservationID: reservationID,
 		Amount:        amount,
-		Status:        PaymentPending,
+		Status:        StatusPending,
 		PaymentMethod: method,
 		CreatedAt:     time.Now(),
 		UpdatedAt:     time.Now(),
@@ -68,85 +69,83 @@ func NewPayment(id PaymentID, reservationID ReservationID, amount Money, method 
 
 // Authorize transitions the payment to authorized status.
 func (p *Payment) Authorize(transactionID string) error {
-	if p.Status == PaymentAuthorized {
+	if p.Status == StatusAuthorized {
 		return ErrAlreadyAuthorized
 	}
 
-	if p.Status != PaymentPending && p.Status != PaymentFailed {
+	if p.Status != StatusPending && p.Status != StatusFailed {
 		return fmt.Errorf("%w: cannot authorize from %s", ErrInvalidPaymentTransition, p.Status)
 	}
 
-	p.Status = PaymentAuthorized
+	p.Status = StatusAuthorized
 	p.TransactionID = transactionID
 	p.UpdatedAt = time.Now()
-	p.addAttempt(PaymentAuthorized, "", "")
+	p.addAttempt(StatusAuthorized, "", "")
 
 	return nil
 }
 
 // Capture transitions the payment to captured status (finalizes the payment).
 func (p *Payment) Capture() error {
-	if p.Status == PaymentCaptured {
+	if p.Status == StatusCaptured {
 		return ErrAlreadyCaptured
 	}
 
-	if p.Status != PaymentAuthorized {
+	if p.Status != StatusAuthorized {
 		return ErrNotAuthorized
 	}
 
-	p.Status = PaymentCaptured
+	p.Status = StatusCaptured
 	p.UpdatedAt = time.Now()
-	p.addAttempt(PaymentCaptured, "", "")
+	p.addAttempt(StatusCaptured, "", "")
 
 	return nil
 }
 
 // Fail marks the payment as failed with error details.
 func (p *Payment) Fail(errorCode, errorMsg string) error {
-	if p.Status == PaymentCaptured || p.Status == PaymentRefunded {
+	if p.Status == StatusCaptured || p.Status == StatusRefunded {
 		return fmt.Errorf("%w: cannot fail from %s", ErrInvalidPaymentTransition, p.Status)
 	}
 
-	p.Status = PaymentFailed
+	p.Status = StatusFailed
 	p.UpdatedAt = time.Now()
-	p.addAttempt(PaymentFailed, errorCode, errorMsg)
+	p.addAttempt(StatusFailed, errorCode, errorMsg)
 
 	return nil
 }
 
 // Refund transitions the payment to refunded status.
 func (p *Payment) Refund() error {
-	if p.Status == PaymentRefunded {
+	if p.Status == StatusRefunded {
 		return ErrAlreadyRefunded
 	}
 
-	if p.Status != PaymentCaptured {
+	if p.Status != StatusCaptured {
 		return ErrCannotRefund
 	}
 
-	p.Status = PaymentRefunded
+	p.Status = StatusRefunded
 	p.UpdatedAt = time.Now()
-	p.addAttempt(PaymentRefunded, "", "")
+	p.addAttempt(StatusRefunded, "", "")
 
 	return nil
 }
 
 // IsSuccessful returns true if the payment was successfully captured.
 func (p *Payment) IsSuccessful() bool {
-	return p.Status == PaymentCaptured
+	return p.Status == StatusCaptured
 }
 
 // CanBeRetried returns true if the payment can be retried.
 func (p *Payment) CanBeRetried() bool {
-	// Can only retry failed or pending payments
-	if p.Status != PaymentFailed && p.Status != PaymentPending {
+	if p.Status != StatusFailed && p.Status != StatusPending {
 		return false
 	}
 
-	// Limit retry attempts to 3
 	failedAttempts := 0
 	for _, attempt := range p.Attempts {
-		if attempt.Status == PaymentFailed {
+		if attempt.Status == StatusFailed {
 			failedAttempts++
 		}
 	}
@@ -163,14 +162,4 @@ func (p *Payment) addAttempt(status PaymentStatus, errorCode, errorMsg string) {
 		ErrorMsg:    errorMsg,
 	}
 	p.Attempts = append(p.Attempts, attempt)
-}
-
-// NewPaymentAttempt creates a new payment attempt entity.
-func NewPaymentAttempt(status PaymentStatus, errorCode, errorMsg string) PaymentAttempt {
-	return PaymentAttempt{
-		AttemptedAt: time.Now(),
-		Status:      status,
-		ErrorCode:   errorCode,
-		ErrorMsg:    errorMsg,
-	}
 }

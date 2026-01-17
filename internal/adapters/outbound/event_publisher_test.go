@@ -9,7 +9,7 @@ import (
 	"github.com/andygeiss/cloud-native-utils/assert"
 	"github.com/andygeiss/cloud-native-utils/messaging"
 	"github.com/andygeiss/cloud-native-utils/service"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
+	"github.com/andygeiss/hotel-booking/internal/adapters/outbound"
 )
 
 // ============================================================================

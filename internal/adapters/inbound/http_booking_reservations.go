@@ -7,7 +7,7 @@ import (
 	"github.com/andygeiss/cloud-native-utils/redirecting"
 	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 // ReservationListItem represents a reservation item for the list view.
@@ -31,7 +31,7 @@ type HttpViewReservationsResponse struct {
 }
 
 // HttpViewReservations defines an HTTP handler function for rendering the reservations list.
-func HttpViewReservations(e *templating.Engine, reservationService *booking.ReservationService) http.HandlerFunc {
+func HttpViewReservations(e *templating.Engine, reservationService *reservation.Service) http.HandlerFunc {
 	appName := os.Getenv("APP_NAME")
 	title := appName + " - Reservations"
 
@@ -47,11 +47,11 @@ func HttpViewReservations(e *templating.Engine, reservationService *booking.Rese
 		}
 
 		// Get reservations for the current user (using email as guest ID)
-		guestID := booking.GuestID(email)
+		guestID := reservation.GuestID(email)
 		reservations, err := reservationService.ListReservationsByGuest(ctx, guestID)
 		if err != nil {
 			// If repository doesn't exist yet, treat as empty list
-			reservations = []*booking.Reservation{}
+			reservations = []*reservation.Reservation{}
 		}
 
 		// Convert domain reservations to view items
@@ -81,17 +81,17 @@ func HttpViewReservations(e *templating.Engine, reservationService *booking.Rese
 }
 
 // reservationStatusClass returns the CSS class for a reservation status.
-func reservationStatusClass(status booking.ReservationStatus) string {
+func reservationStatusClass(status reservation.ReservationStatus) string {
 	switch status {
-	case booking.StatusPending:
+	case reservation.StatusPending:
 		return "warning"
-	case booking.StatusConfirmed:
+	case reservation.StatusConfirmed:
 		return "info"
-	case booking.StatusActive:
+	case reservation.StatusActive:
 		return "primary"
-	case booking.StatusCompleted:
+	case reservation.StatusCompleted:
 		return "success"
-	case booking.StatusCancelled:
+	case reservation.StatusCancelled:
 		return "danger"
 	default:
 		return "secondary"

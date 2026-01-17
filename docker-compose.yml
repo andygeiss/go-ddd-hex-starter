@@ -10,6 +10,38 @@
 #   docker-compose logs -f app  # View app logs
 
 services:
+
+  # ======================================
+  # App - Go DDD/Hexagonal Application
+  # ======================================
+  # Main application container built from Dockerfile
+  # Provides HTTP API on port 8080 and CLI tools
+  # Depends on Keycloak for auth and Kafka for events
+  app:
+    image: "${USER}/${APP_SHORTNAME}:latest"
+    container_name: "${APP_SHORTNAME}"
+    depends_on:
+      - keycloak
+      - kafka
+      - postgres
+    env_file:
+      # Load all environment variables from .env into the container
+      - .env
+    ports:
+      # HTTP server (localhost only - use reverse proxy in production)
+      - "8080:8080"
+    extra_hosts:
+      # Allow the app container to reach host-published services via `localhost`.
+      #
+      # This is used to keep a single OIDC issuer URL (http://localhost:8180/realms/local)
+      # that works for both:
+      # - the browser on the host
+      # - the app inside the container (which otherwise can't reach host localhost)
+      #
+      # Requires a Docker engine that supports `host-gateway`.
+      - "localhost:host-gateway"
+    restart: unless-stopped
+
   # ======================================
   # Keycloak - Authentication & Authorization
   # ======================================
@@ -62,34 +94,30 @@ services:
     restart: unless-stopped
 
   # ======================================
-  # App - Go DDD/Hexagonal Application
+  # PostgreSQL - Relational Database
   # ======================================
-  # Main application container built from Dockerfile
-  # Provides HTTP API on port 8080 and CLI tools
-  # Depends on Keycloak for auth and Kafka for events
-  app:
-    image: "${USER}/${APP_SHORTNAME}:latest"
-    container_name: "${APP_SHORTNAME}"
-    depends_on:
-      - keycloak
-      - kafka
-    env_file:
-      # Load all environment variables from .env into the container
-      - .env
+  # Primary data store for domain aggregates (reservations, payments)
+  # Replaces file-based JSON persistence for production use
+  postgres:
+    image: postgres:16-alpine
+    container_name: postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-booking}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-booking_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-booking_db}
     volumes:
-      # Persist reservation data across container restarts
-      - ./reservations.json:/reservations.json
+      # Persist data across container restarts
+      - postgres_data:/var/lib/postgresql/data
+      # Initialize schema on first run
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     ports:
-      # HTTP server (localhost only - use reverse proxy in production)
-      - "8080:8080"
-    extra_hosts:
-      # Allow the app container to reach host-published services via `localhost`.
-      #
-      # This is used to keep a single OIDC issuer URL (http://localhost:8180/realms/local)
-      # that works for both:
-      # - the browser on the host
-      # - the app inside the container (which otherwise can't reach host localhost)
-      #
-      # Requires a Docker engine that supports `host-gateway`.
-      - "localhost:host-gateway"
+      - "5432:5432"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-booking}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:

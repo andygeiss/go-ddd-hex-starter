@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/andygeiss/cloud-native-utils/assert"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 // ============================================================================
@@ -13,7 +13,7 @@ import (
 
 func Test_ReservationStatusClass_Pending_Should_Return_Warning(t *testing.T) {
 	// Arrange
-	status := booking.StatusPending
+	status := reservation.StatusPending
 
 	// Act
 	result := testReservationStatusClass(status)
@@ -24,7 +24,7 @@ func Test_ReservationStatusClass_Pending_Should_Return_Warning(t *testing.T) {
 
 func Test_ReservationStatusClass_Confirmed_Should_Return_Info(t *testing.T) {
 	// Arrange
-	status := booking.StatusConfirmed
+	status := reservation.StatusConfirmed
 
 	// Act
 	result := testReservationStatusClass(status)
@@ -35,7 +35,7 @@ func Test_ReservationStatusClass_Confirmed_Should_Return_Info(t *testing.T) {
 
 func Test_ReservationStatusClass_Active_Should_Return_Primary(t *testing.T) {
 	// Arrange
-	status := booking.StatusActive
+	status := reservation.StatusActive
 
 	// Act
 	result := testReservationStatusClass(status)
@@ -46,7 +46,7 @@ func Test_ReservationStatusClass_Active_Should_Return_Primary(t *testing.T) {
 
 func Test_ReservationStatusClass_Completed_Should_Return_Success(t *testing.T) {
 	// Arrange
-	status := booking.StatusCompleted
+	status := reservation.StatusCompleted
 
 	// Act
 	result := testReservationStatusClass(status)
@@ -57,7 +57,7 @@ func Test_ReservationStatusClass_Completed_Should_Return_Success(t *testing.T) {
 
 func Test_ReservationStatusClass_Cancelled_Should_Return_Danger(t *testing.T) {
 	// Arrange
-	status := booking.StatusCancelled
+	status := reservation.StatusCancelled
 
 	// Act
 	result := testReservationStatusClass(status)
@@ -68,7 +68,7 @@ func Test_ReservationStatusClass_Cancelled_Should_Return_Danger(t *testing.T) {
 
 func Test_ReservationStatusClass_Unknown_Should_Return_Secondary(t *testing.T) {
 	// Arrange
-	status := booking.ReservationStatus("unknown")
+	status := reservation.ReservationStatus("unknown")
 
 	// Act
 	result := testReservationStatusClass(status)
@@ -77,17 +77,17 @@ func Test_ReservationStatusClass_Unknown_Should_Return_Secondary(t *testing.T) {
 	assert.That(t, "status class must be secondary", result, "secondary")
 }
 
-func testReservationStatusClass(status booking.ReservationStatus) string {
+func testReservationStatusClass(status reservation.ReservationStatus) string {
 	switch status {
-	case booking.StatusPending:
+	case reservation.StatusPending:
 		return "warning"
-	case booking.StatusConfirmed:
+	case reservation.StatusConfirmed:
 		return "info"
-	case booking.StatusActive:
+	case reservation.StatusActive:
 		return "primary"
-	case booking.StatusCompleted:
+	case reservation.StatusCompleted:
 		return "success"
-	case booking.StatusCancelled:
+	case reservation.StatusCancelled:
 		return "danger"
 	default:
 		return "secondary"

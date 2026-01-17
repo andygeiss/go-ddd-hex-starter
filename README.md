@@ -1,20 +1,20 @@
 <p align="center">
-<img src="https://github.com/andygeiss/go-ddd-hex-starter/blob/main/cmd/server/assets/static/img/icon-192.png?raw=true" width="100"/>
+<img src="https://github.com/andygeiss/hotel-booking/blob/main/cmd/server/assets/static/img/icon-192.png?raw=true" width="100"/>
 </p>
 
-# Go DDD Hexagonal Starter
+# Go Hotel Booking
 
-[![Go Reference](https://pkg.go.dev/badge/github.com/andygeiss/go-ddd-hex-starter.svg)](https://pkg.go.dev/github.com/andygeiss/go-ddd-hex-starter)
-[![License](https://img.shields.io/github/license/andygeiss/go-ddd-hex-starter)](https://github.com/andygeiss/go-ddd-hex-starter/blob/master/LICENSE)
-[![Releases](https://img.shields.io/github/v/release/andygeiss/go-ddd-hex-starter)](https://github.com/andygeiss/go-ddd-hex-starter/releases)
-[![Go Report Card](https://goreportcard.com/badge/github.com/andygeiss/go-ddd-hex-starter)](https://goreportcard.com/report/github.com/andygeiss/go-ddd-hex-starter)
-[![Codacy Badge](https://app.codacy.com/project/badge/Grade/f9f01632dff14c448dbd4688abbd04e8)](https://app.codacy.com/gh/andygeiss/go-ddd-hex-starter/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
-[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/f9f01632dff14c448dbd4688abbd04e8)](https://app.codacy.com/gh/andygeiss/go-ddd-hex-starter/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
+[![Go Reference](https://pkg.go.dev/badge/github.com/andygeiss/hotel-booking.svg)](https://pkg.go.dev/github.com/andygeiss/hotel-booking)
+[![License](https://img.shields.io/github/license/andygeiss/hotel-booking)](https://github.com/andygeiss/hotel-booking/blob/master/LICENSE)
+[![Releases](https://img.shields.io/github/v/release/andygeiss/hotel-booking)](https://github.com/andygeiss/hotel-booking/releases)
+[![Go Report Card](https://goreportcard.com/badge/github.com/andygeiss/hotel-booking)](https://goreportcard.com/report/github.com/andygeiss/hotel-booking)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/f9f01632dff14c448dbd4688abbd04e8)](https://app.codacy.com/gh/andygeiss/hotel-booking/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
+[![Codacy Badge](https://app.codacy.com/project/badge/Coverage/f9f01632dff14c448dbd4688abbd04e8)](https://app.codacy.com/gh/andygeiss/hotel-booking/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_coverage)
 
-A production-ready Go starter template demonstrating Domain-Driven Design (DDD) and Hexagonal Architecture (Ports & Adapters) patterns with a complete **Hotel Booking** domain example.
+A hotel reservation and payment management system built with Go, demonstrating Domain-Driven Design (DDD) and Hexagonal Architecture (Ports & Adapters) patterns.
 
 <p align="center">
-<img src="https://github.com/andygeiss/go-ddd-hex-starter/blob/main/cmd/server/assets/static/img/login.png?raw=true" width="300"/>
+<img src="https://github.com/andygeiss/hotel-booking/blob/main/cmd/server/assets/static/img/login.png?raw=true" width="300"/>
 </p>
 
 ---
@@ -192,7 +192,7 @@ CompleteBooking Workflow:
 ## Project Structure
 
 ```
-go-ddd-hex-starter/
+hotel-booking/
 ├── .justfile                     # Task runner commands
 ├── cmd/server/                   # HTTP server entry point
 │   ├── main.go                   # Bootstrap: DI, server setup, lifecycle
@@ -239,8 +239,8 @@ go-ddd-hex-starter/
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/andygeiss/go-ddd-hex-starter.git
-   cd go-ddd-hex-starter
+   git clone https://github.com/andygeiss/hotel-booking.git
+   cd hotel-booking
    ```
 
 2. **Install development tools:**
@@ -355,11 +355,12 @@ Configuration is managed via environment variables. Copy `.env.example` to `.env
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `APP_NAME` | Display name for UI and PWA | `Template` |
-| `APP_SHORTNAME` | Docker image/container name | `template` |
+| `APP_NAME` | Display name for UI and PWA | `Hotel Booking` |
+| `APP_DESCRIPTION` | Application description | `Hotel reservation and payment management system` |
+| `APP_SHORTNAME` | Docker image/container name | `hotel-booking` |
 | `APP_VERSION` | Version for PWA cache busting | `1.0.0` |
 | `KAFKA_BROKERS` | Kafka broker addresses | `localhost:9092` |
-| `OIDC_CLIENT_ID` | OIDC client ID | `template` |
+| `OIDC_CLIENT_ID` | OIDC client ID | `hotel-booking` |
 | `OIDC_CLIENT_SECRET` | OIDC client secret | Auto-generated |
 | `OIDC_ISSUER` | Keycloak realm URL | `http://localhost:8180/realms/local` |
 | `PORT` | HTTP server port | `8080` |
@@ -374,7 +375,7 @@ See `.env.example` for the complete list with documentation.
 
 1. **Clone and reinitialize:**
    ```bash
-   git clone https://github.com/andygeiss/go-ddd-hex-starter my-project
+   git clone https://github.com/andygeiss/hotel-booking my-project
    cd my-project
    rm -rf .git && git init
    ```

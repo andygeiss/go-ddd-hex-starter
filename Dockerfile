@@ -40,7 +40,7 @@ COPY . .
 #   -o server: Output binary name
 RUN go build \
     -ldflags "-s -w" \
-    -pgo cpuprofile.pprof \
+    -pgo .cpuprofile.pprof \
     -o server ./cmd/server
 
 ############################

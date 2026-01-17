@@ -11,7 +11,7 @@ import (
 	"github.com/andygeiss/cloud-native-utils/assert"
 	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
+	"github.com/andygeiss/hotel-booking/internal/adapters/inbound"
 )
 
 // ============================================================================

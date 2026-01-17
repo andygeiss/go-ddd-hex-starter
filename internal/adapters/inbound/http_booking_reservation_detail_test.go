@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/andygeiss/cloud-native-utils/assert"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 // ============================================================================
@@ -81,9 +81,9 @@ func Test_HttpViewReservationDetailResponse_Required_Fields(t *testing.T) {
 
 func Test_BuildReservationDetailView_Logic_Should_Convert_Guests(t *testing.T) {
 	// Arrange
-	domainGuests := []booking.GuestInfo{
-		booking.NewGuestInfo("John Doe", "john@example.com", "+1234567890"),
-		booking.NewGuestInfo("Jane Doe", "jane@example.com", "+0987654321"),
+	domainGuests := []reservation.GuestInfo{
+		reservation.NewGuestInfo("John Doe", "john@example.com", "+1234567890"),
+		reservation.NewGuestInfo("Jane Doe", "jane@example.com", "+0987654321"),
 	}
 
 	viewGuests := make([]struct {
@@ -161,14 +161,14 @@ func Test_ReservationDetailView_With_Cancellation_Reason_Should_Show_Reason(t *t
 func Test_StatusClass_Mapping_For_All_Statuses(t *testing.T) {
 	// Arrange
 	tests := []struct {
-		status   booking.ReservationStatus
+		status   reservation.ReservationStatus
 		expected string
 	}{
-		{booking.StatusPending, "warning"},
-		{booking.StatusConfirmed, "info"},
-		{booking.StatusActive, "primary"},
-		{booking.StatusCompleted, "success"},
-		{booking.StatusCancelled, "danger"},
+		{reservation.StatusPending, "warning"},
+		{reservation.StatusConfirmed, "info"},
+		{reservation.StatusActive, "primary"},
+		{reservation.StatusCompleted, "success"},
+		{reservation.StatusCancelled, "danger"},
 	}
 
 	// Act & Assert

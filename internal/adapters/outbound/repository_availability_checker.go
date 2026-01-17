@@ -4,16 +4,16 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 // RepositoryAvailabilityChecker implements AvailabilityChecker by querying the reservation repository.
 type RepositoryAvailabilityChecker struct {
-	reservationRepo booking.ReservationRepository
+	reservationRepo reservation.ReservationRepository
 }
 
 // NewRepositoryAvailabilityChecker creates a new availability checker.
-func NewRepositoryAvailabilityChecker(repo booking.ReservationRepository) *RepositoryAvailabilityChecker {
+func NewRepositoryAvailabilityChecker(repo reservation.ReservationRepository) *RepositoryAvailabilityChecker {
 	return &RepositoryAvailabilityChecker{
 		reservationRepo: repo,
 	}
@@ -22,8 +22,8 @@ func NewRepositoryAvailabilityChecker(repo booking.ReservationRepository) *Repos
 // IsRoomAvailable checks if a room is available for the given date range.
 func (c *RepositoryAvailabilityChecker) IsRoomAvailable(
 	ctx context.Context,
-	roomID booking.RoomID,
-	dateRange booking.DateRange,
+	roomID reservation.RoomID,
+	dateRange reservation.DateRange,
 ) (bool, error) {
 	overlapping, err := c.GetOverlappingReservations(ctx, roomID, dateRange)
 	if err != nil {
@@ -37,9 +37,9 @@ func (c *RepositoryAvailabilityChecker) IsRoomAvailable(
 // GetOverlappingReservations returns all reservations that overlap with the given date range.
 func (c *RepositoryAvailabilityChecker) GetOverlappingReservations(
 	ctx context.Context,
-	roomID booking.RoomID,
-	dateRange booking.DateRange,
-) ([]*booking.Reservation, error) {
+	roomID reservation.RoomID,
+	dateRange reservation.DateRange,
+) ([]*reservation.Reservation, error) {
 	// Get all reservations
 	allReservations, err := c.reservationRepo.ReadAll(ctx)
 	if err != nil {
@@ -47,14 +47,14 @@ func (c *RepositoryAvailabilityChecker) GetOverlappingReservations(
 	}
 
 	// Create a temporary reservation to use IsOverlapping method
-	tempReservation := &booking.Reservation{
+	tempReservation := &reservation.Reservation{
 		RoomID:    roomID,
 		DateRange: dateRange,
-		Status:    booking.StatusPending, // Status doesn't matter for overlap check
+		Status:    reservation.StatusPending, // Status doesn't matter for overlap check
 	}
 
 	// Filter for overlapping reservations
-	var overlapping []*booking.Reservation
+	var overlapping []*reservation.Reservation
 	for _, res := range allReservations {
 		r := res // Create a copy
 		if tempReservation.IsOverlapping(&r) {

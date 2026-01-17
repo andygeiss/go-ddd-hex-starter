@@ -3,6 +3,7 @@ package inbound_test
 import (
 	"context"
 	"embed"
+	"errors"
 	"io"
 	"io/fs"
 	"log/slog"
@@ -12,9 +13,9 @@ import (
 
 	"github.com/andygeiss/cloud-native-utils/assert"
 	"github.com/andygeiss/cloud-native-utils/messaging"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/adapters/inbound"
+	"github.com/andygeiss/hotel-booking/internal/adapters/outbound"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 // ============================================================================
@@ -36,12 +37,54 @@ func getRouterTestFS(t *testing.T) fs.FS {
 	return sub
 }
 
-func createTestReservationService(t *testing.T) *booking.ReservationService {
+// mockReservationRepository is a simple in-memory mock for testing.
+type mockReservationRepository struct {
+	reservations map[reservation.ReservationID]reservation.Reservation
+}
+
+func newMockReservationRepository() *mockReservationRepository {
+	return &mockReservationRepository{
+		reservations: make(map[reservation.ReservationID]reservation.Reservation),
+	}
+}
+
+func (m *mockReservationRepository) Create(ctx context.Context, id reservation.ReservationID, res reservation.Reservation) error {
+	m.reservations[id] = res
+	return nil
+}
+
+func (m *mockReservationRepository) Read(ctx context.Context, id reservation.ReservationID) (*reservation.Reservation, error) {
+	res, ok := m.reservations[id]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return &res, nil
+}
+
+func (m *mockReservationRepository) Update(ctx context.Context, id reservation.ReservationID, res reservation.Reservation) error {
+	m.reservations[id] = res
+	return nil
+}
+
+func (m *mockReservationRepository) Delete(ctx context.Context, id reservation.ReservationID) error {
+	delete(m.reservations, id)
+	return nil
+}
+
+func (m *mockReservationRepository) ReadAll(ctx context.Context) ([]reservation.Reservation, error) {
+	result := make([]reservation.Reservation, 0, len(m.reservations))
+	for _, res := range m.reservations {
+		result = append(result, res)
+	}
+	return result, nil
+}
+
+func createTestReservationService(t *testing.T) *reservation.Service {
 	t.Helper()
-	reservationRepo := outbound.NewFileReservationRepository("test_reservations.json")
+	reservationRepo := newMockReservationRepository()
 	availabilityChecker := outbound.NewRepositoryAvailabilityChecker(reservationRepo)
 	eventPublisher := outbound.NewEventPublisher(messaging.NewInternalDispatcher())
-	return booking.NewReservationService(reservationRepo, availabilityChecker, eventPublisher)
+	return reservation.NewService(reservationRepo, availabilityChecker, eventPublisher)
 }
 
 // ============================================================================

@@ -5,7 +5,8 @@ import (
 	"errors"
 	"log/slog"
 
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/payment"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 // MockNotificationService implements NotificationService by logging to console.
@@ -23,22 +24,22 @@ func NewMockNotificationService(logger *slog.Logger) *MockNotificationService {
 // SendReservationConfirmation logs a confirmation message.
 func (s *MockNotificationService) SendReservationConfirmation(
 	ctx context.Context,
-	reservation *booking.Reservation,
+	res *reservation.Reservation,
 ) error {
-	if len(reservation.Guests) == 0 {
+	if len(res.Guests) == 0 {
 		return errors.New("no guests found in reservation")
 	}
 
-	primaryGuest := reservation.Guests[0]
+	primaryGuest := res.Guests[0]
 
 	s.logger.Info("sending reservation confirmation email",
-		"reservation_id", reservation.ID,
+		"reservation_id", res.ID,
 		"guest_email", primaryGuest.Email,
 		"guest_name", primaryGuest.Name,
-		"room_id", reservation.RoomID,
-		"check_in", reservation.DateRange.CheckIn.Format("2006-01-02"),
-		"check_out", reservation.DateRange.CheckOut.Format("2006-01-02"),
-		"total_amount", reservation.TotalAmount.FormatAmount(),
+		"room_id", res.RoomID,
+		"check_in", res.DateRange.CheckIn.Format("2006-01-02"),
+		"check_out", res.DateRange.CheckOut.Format("2006-01-02"),
+		"total_amount", res.TotalAmount.FormatAmount(),
 	)
 
 	return nil
@@ -47,17 +48,17 @@ func (s *MockNotificationService) SendReservationConfirmation(
 // SendCancellationNotice logs a cancellation message.
 func (s *MockNotificationService) SendCancellationNotice(
 	ctx context.Context,
-	reservation *booking.Reservation,
+	res *reservation.Reservation,
 	reason string,
 ) error {
-	if len(reservation.Guests) == 0 {
+	if len(res.Guests) == 0 {
 		return errors.New("no guests found in reservation")
 	}
 
-	primaryGuest := reservation.Guests[0]
+	primaryGuest := res.Guests[0]
 
 	s.logger.Info("sending cancellation notice email",
-		"reservation_id", reservation.ID,
+		"reservation_id", res.ID,
 		"guest_email", primaryGuest.Email,
 		"guest_name", primaryGuest.Name,
 		"reason", reason,
@@ -69,14 +70,14 @@ func (s *MockNotificationService) SendCancellationNotice(
 // SendPaymentReceipt logs a payment receipt message.
 func (s *MockNotificationService) SendPaymentReceipt(
 	ctx context.Context,
-	payment *booking.Payment,
+	pay *payment.Payment,
 ) error {
 	s.logger.Info("sending payment receipt email",
-		"payment_id", payment.ID,
-		"reservation_id", payment.ReservationID,
-		"amount", payment.Amount.FormatAmount(),
-		"payment_method", payment.PaymentMethod,
-		"transaction_id", payment.TransactionID,
+		"payment_id", pay.ID,
+		"reservation_id", pay.ReservationID,
+		"amount", pay.Amount.FormatAmount(),
+		"payment_method", pay.PaymentMethod,
+		"transaction_id", pay.TransactionID,
 	)
 
 	return nil

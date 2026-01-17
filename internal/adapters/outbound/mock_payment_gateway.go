@@ -7,12 +7,13 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/domain/payment"
+	"github.com/andygeiss/hotel-booking/internal/domain/shared"
 )
 
 // MockPaymentGateway simulates a payment gateway for testing and demonstration.
 type MockPaymentGateway struct {
-	transactions map[string]booking.Money
+	transactions map[string]shared.Money
 	FailureRate  float64 // 0.0 to 1.0, probability of random failures
 	ShouldFail   bool
 }
@@ -22,7 +23,7 @@ func NewMockPaymentGateway() *MockPaymentGateway {
 	return &MockPaymentGateway{
 		ShouldFail:   false,
 		FailureRate:  0.0,
-		transactions: make(map[string]booking.Money),
+		transactions: make(map[string]shared.Money),
 	}
 }
 
@@ -37,19 +38,19 @@ func cryptoRandFloat64() float64 {
 }
 
 // Authorize simulates authorizing a payment.
-func (g *MockPaymentGateway) Authorize(ctx context.Context, payment *booking.Payment) (string, error) {
+func (g *MockPaymentGateway) Authorize(ctx context.Context, pay *payment.Payment) (string, error) {
 	if g.ShouldFail || (g.FailureRate > 0 && cryptoRandFloat64() < g.FailureRate) {
 		return "", errors.New("payment authorization failed: insufficient funds")
 	}
 
-	transactionID := fmt.Sprintf("txn_%s_%d", payment.ID, payment.Amount.Amount)
-	g.transactions[transactionID] = payment.Amount
+	transactionID := fmt.Sprintf("txn_%s_%d", pay.ID, pay.Amount.Amount)
+	g.transactions[transactionID] = pay.Amount
 
 	return transactionID, nil
 }
 
 // Capture simulates capturing an authorized payment.
-func (g *MockPaymentGateway) Capture(ctx context.Context, transactionID string, amount booking.Money) error {
+func (g *MockPaymentGateway) Capture(ctx context.Context, transactionID string, amount shared.Money) error {
 	if g.ShouldFail || (g.FailureRate > 0 && cryptoRandFloat64() < g.FailureRate) {
 		return errors.New("payment capture failed: gateway timeout")
 	}
@@ -67,7 +68,7 @@ func (g *MockPaymentGateway) Capture(ctx context.Context, transactionID string, 
 }
 
 // Refund simulates refunding a captured payment.
-func (g *MockPaymentGateway) Refund(ctx context.Context, transactionID string, amount booking.Money) error {
+func (g *MockPaymentGateway) Refund(ctx context.Context, transactionID string, amount shared.Money) error {
 	if g.ShouldFail || (g.FailureRate > 0 && cryptoRandFloat64() < g.FailureRate) {
 		return errors.New("payment refund failed: gateway error")
 	}
@@ -94,7 +95,7 @@ func (g *MockPaymentGateway) SetFailureRate(rate float64) {
 
 // Reset clears all transaction state.
 func (g *MockPaymentGateway) Reset() {
-	g.transactions = make(map[string]booking.Money)
+	g.transactions = make(map[string]shared.Money)
 	g.ShouldFail = false
 	g.FailureRate = 0.0
 }

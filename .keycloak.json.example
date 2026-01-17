@@ -1,9 +1,9 @@
 {
   "clients": [
     {
-      "clientId": "template",
+      "clientId": "hotel-booking",
       "directAccessGrantsEnabled": true,
-      "name": "template",
+      "name": "hotel-booking",
       "protocol": "openid-connect",
       "publicClient": false,
       "redirectUris": ["http://localhost:8080/auth/callback"],

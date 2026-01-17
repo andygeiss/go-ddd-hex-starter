@@ -1,28 +1,23 @@
-package booking
+// Package reservation contains the Reservation bounded context.
+// It handles all reservation-related domain logic including creation,
+// state transitions, and business rule validation.
+package reservation
 
 import (
 	"errors"
 	"fmt"
-	"strings"
 	"time"
+
+	"github.com/andygeiss/hotel-booking/internal/domain/shared"
 )
 
-// ReservationID is a strongly-typed ID for reservations.
-type ReservationID string
+// Type aliases for shared types
+type ReservationID = shared.ReservationID
+type Money = shared.Money
+
+// Local ID types for this bounded context
 type GuestID string
 type RoomID string
-
-// DateRange represents a time period for a reservation.
-type DateRange struct {
-	CheckIn  time.Time
-	CheckOut time.Time
-}
-
-// Money represents a monetary value in the smallest currency unit (cents).
-type Money struct {
-	Currency string // ISO 4217 currency code (e.g., "USD", "EUR")
-	Amount   int64  // Amount in cents/smallest unit
-}
 
 // ReservationStatus represents the state of a reservation.
 type ReservationStatus string
@@ -35,25 +30,18 @@ const (
 	StatusCancelled ReservationStatus = "cancelled"
 )
 
-// GuestInfo represents information about a guest (entity within Reservation aggregate).
-type GuestInfo struct {
-	Name        string
-	Email       string
-	PhoneNumber string
-}
-
 // Reservation is the aggregate root for booking reservations.
 type Reservation struct {
-	ID              ReservationID
-	GuestID         GuestID
-	RoomID          RoomID
-	DateRange       DateRange
-	Status          ReservationStatus
-	TotalAmount     Money
+	ID                 ReservationID
+	GuestID            GuestID
+	RoomID             RoomID
+	DateRange          DateRange
+	Status             ReservationStatus
+	TotalAmount        Money
 	CancellationReason string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-	Guests          []GuestInfo
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	Guests             []GuestInfo
 }
 
 // Validation errors.
@@ -125,22 +113,18 @@ func (r *Reservation) Complete() error {
 
 // Cancel cancels the reservation with business rule validation.
 func (r *Reservation) Cancel(reason string) error {
-	// Cannot cancel already cancelled reservations
 	if r.Status == StatusCancelled {
 		return ErrAlreadyCancelled
 	}
 
-	// Cannot cancel completed reservations
 	if r.Status == StatusCompleted {
 		return ErrCannotCancelCompleted
 	}
 
-	// Cannot cancel active reservations
 	if r.Status == StatusActive {
 		return ErrCannotCancelActive
 	}
 
-	// Cannot cancel within 24 hours of check-in
 	if !r.CanBeCancelled() {
 		return ErrCannotCancelNearCheckIn
 	}
@@ -153,12 +137,10 @@ func (r *Reservation) Cancel(reason string) error {
 
 // CanBeCancelled checks if the reservation can be cancelled based on business rules.
 func (r *Reservation) CanBeCancelled() bool {
-	// Already cancelled, completed, or active cannot be cancelled
 	if r.Status == StatusCancelled || r.Status == StatusCompleted || r.Status == StatusActive {
 		return false
 	}
 
-	// Check if within 24 hours of check-in
 	now := time.Now()
 	hoursUntilCheckIn := r.DateRange.CheckIn.Sub(now).Hours()
 	return hoursUntilCheckIn >= 24
@@ -166,19 +148,14 @@ func (r *Reservation) CanBeCancelled() bool {
 
 // IsOverlapping checks if this reservation overlaps with another for the same room.
 func (r *Reservation) IsOverlapping(other *Reservation) bool {
-	// Different rooms never overlap
 	if r.RoomID != other.RoomID {
 		return false
 	}
 
-	// Cancelled reservations don't count as overlapping
 	if r.Status == StatusCancelled || other.Status == StatusCancelled {
 		return false
 	}
 
-	// Check for date overlap
-	// Reservations overlap if: r.CheckIn < other.CheckOut AND r.CheckOut > other.CheckIn
-	// Note: Same-day checkout/check-in is allowed (not considered overlapping)
 	return r.DateRange.CheckIn.Before(other.DateRange.CheckOut) &&
 		r.DateRange.CheckOut.After(other.DateRange.CheckIn)
 }
@@ -230,35 +207,4 @@ func (r *Reservation) validateDateRange() error {
 	}
 
 	return nil
-}
-
-// NewMoney creates a Money value object with validation.
-func NewMoney(amount int64, currency string) Money {
-	return Money{
-		Amount:   amount,
-		Currency: strings.ToUpper(currency),
-	}
-}
-
-// FormatAmount returns a human-readable amount (converts cents to dollars).
-func (m Money) FormatAmount() string {
-	dollars := float64(m.Amount) / 100.0
-	return fmt.Sprintf("%.2f %s", dollars, m.Currency)
-}
-
-// NewDateRange creates a DateRange value object.
-func NewDateRange(checkIn, checkOut time.Time) DateRange {
-	return DateRange{
-		CheckIn:  checkIn,
-		CheckOut: checkOut,
-	}
-}
-
-// NewGuestInfo creates a GuestInfo entity.
-func NewGuestInfo(name, email, phoneNumber string) GuestInfo {
-	return GuestInfo{
-		Name:        name,
-		Email:       email,
-		PhoneNumber: phoneNumber,
-	}
 }

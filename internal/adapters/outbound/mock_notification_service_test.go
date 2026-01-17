@@ -8,36 +8,38 @@ import (
 	"time"
 
 	"github.com/andygeiss/cloud-native-utils/assert"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/adapters/outbound"
+	"github.com/andygeiss/hotel-booking/internal/domain/payment"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
+	"github.com/andygeiss/hotel-booking/internal/domain/shared"
 )
 
 // ============================================================================
 // MockNotificationService Tests
 // ============================================================================
 
-func createTestReservation() *booking.Reservation {
+func createTestReservation() *reservation.Reservation {
 	checkIn := time.Now().AddDate(0, 0, 7)
 	checkOut := time.Now().AddDate(0, 0, 10)
 
-	return &booking.Reservation{
+	return &reservation.Reservation{
 		ID:        "res-001",
 		GuestID:   "guest-001",
 		RoomID:    "room-101",
-		DateRange: booking.NewDateRange(checkIn, checkOut),
-		Status:    booking.StatusPending,
-		TotalAmount: booking.NewMoney(30000, "USD"),
-		Guests: []booking.GuestInfo{
-			booking.NewGuestInfo("John Doe", "john@example.com", "+1234567890"),
+		DateRange: reservation.NewDateRange(checkIn, checkOut),
+		Status:    reservation.StatusPending,
+		TotalAmount: shared.NewMoney(30000, "USD"),
+		Guests: []reservation.GuestInfo{
+			reservation.NewGuestInfo("John Doe", "john@example.com", "+1234567890"),
 		},
 	}
 }
 
-func createTestPayment() *booking.Payment {
-	return booking.NewPayment(
+func createTestPayment() *payment.Payment {
+	return payment.NewPayment(
 		"pay-001",
 		"res-001",
-		booking.NewMoney(30000, "USD"),
+		shared.NewMoney(30000, "USD"),
 		"credit_card",
 	)
 }
@@ -47,10 +49,10 @@ func Test_MockNotificationService_SendReservationConfirmation_Should_Succeed(t *
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	svc := outbound.NewMockNotificationService(logger)
 	ctx := context.Background()
-	reservation := createTestReservation()
+	res := createTestReservation()
 
 	// Act
-	err := svc.SendReservationConfirmation(ctx, reservation)
+	err := svc.SendReservationConfirmation(ctx, res)
 
 	// Assert
 	assert.That(t, "error must be nil", err == nil, true)
@@ -61,11 +63,11 @@ func Test_MockNotificationService_SendReservationConfirmation_No_Guests_Should_R
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	svc := outbound.NewMockNotificationService(logger)
 	ctx := context.Background()
-	reservation := createTestReservation()
-	reservation.Guests = []booking.GuestInfo{}
+	res := createTestReservation()
+	res.Guests = []reservation.GuestInfo{}
 
 	// Act
-	err := svc.SendReservationConfirmation(ctx, reservation)
+	err := svc.SendReservationConfirmation(ctx, res)
 
 	// Assert
 	assert.That(t, "error must not be nil for no guests", err != nil, true)
@@ -76,10 +78,10 @@ func Test_MockNotificationService_SendCancellationNotice_Should_Succeed(t *testi
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	svc := outbound.NewMockNotificationService(logger)
 	ctx := context.Background()
-	reservation := createTestReservation()
+	res := createTestReservation()
 
 	// Act
-	err := svc.SendCancellationNotice(ctx, reservation, "guest requested cancellation")
+	err := svc.SendCancellationNotice(ctx, res, "guest requested cancellation")
 
 	// Assert
 	assert.That(t, "error must be nil", err == nil, true)
@@ -90,11 +92,11 @@ func Test_MockNotificationService_SendCancellationNotice_No_Guests_Should_Return
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	svc := outbound.NewMockNotificationService(logger)
 	ctx := context.Background()
-	reservation := createTestReservation()
-	reservation.Guests = []booking.GuestInfo{}
+	res := createTestReservation()
+	res.Guests = []reservation.GuestInfo{}
 
 	// Act
-	err := svc.SendCancellationNotice(ctx, reservation, "test")
+	err := svc.SendCancellationNotice(ctx, res, "test")
 
 	// Assert
 	assert.That(t, "error must not be nil for no guests", err != nil, true)
@@ -105,10 +107,10 @@ func Test_MockNotificationService_SendPaymentReceipt_Should_Succeed(t *testing.T
 	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelError}))
 	svc := outbound.NewMockNotificationService(logger)
 	ctx := context.Background()
-	payment := createTestPayment()
+	pay := createTestPayment()
 
 	// Act
-	err := svc.SendPaymentReceipt(ctx, payment)
+	err := svc.SendPaymentReceipt(ctx, pay)
 
 	// Assert
 	assert.That(t, "error must be nil", err == nil, true)

@@ -11,9 +11,11 @@ import (
 	"github.com/andygeiss/cloud-native-utils/messaging"
 	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/service"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/inbound"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/adapters/outbound"
-	"github.com/andygeiss/go-ddd-hex-starter/internal/domain/booking"
+	"github.com/andygeiss/hotel-booking/internal/adapters/inbound"
+	"github.com/andygeiss/hotel-booking/internal/adapters/outbound"
+	"github.com/andygeiss/hotel-booking/internal/domain/orchestration"
+	"github.com/andygeiss/hotel-booking/internal/domain/payment"
+	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
 //go:embed assets
@@ -28,11 +30,39 @@ func main() {
 	// We use the logging.NewJsonLogger function from the cloud-native-utils/logging package.
 	logger := logging.NewJsonLogger()
 
-	// Initialize booking domain dependencies.
-	reservationRepo := outbound.NewFileReservationRepository("reservations.json")
+	// Initialize PostgreSQL connection.
+	db, err := outbound.NewPostgresConnection()
+	if err != nil {
+		logger.Error("failed to connect to database", "error", err)
+		os.Exit(1)
+	}
+	defer db.Close()
+
+	// Shared event dispatcher (using internal dispatcher for now, can be switched to Kafka).
+	dispatcher := messaging.NewInternalDispatcher()
+
+	// Initialize reservation bounded context.
+	reservationRepo := outbound.NewPostgresReservationRepository(db)
 	availabilityChecker := outbound.NewRepositoryAvailabilityChecker(reservationRepo)
-	eventPublisher := outbound.NewEventPublisher(messaging.NewInternalDispatcher())
-	reservationService := booking.NewReservationService(reservationRepo, availabilityChecker, eventPublisher)
+	reservationPublisher := outbound.NewEventPublisher(dispatcher)
+	reservationService := reservation.NewService(reservationRepo, availabilityChecker, reservationPublisher)
+
+	// Initialize payment bounded context.
+	paymentRepo := outbound.NewPostgresPaymentRepository(db)
+	paymentGateway := outbound.NewMockPaymentGateway()
+	paymentPublisher := outbound.NewEventPublisher(dispatcher)
+	paymentService := payment.NewService(paymentRepo, paymentGateway, paymentPublisher)
+
+	// Initialize orchestration layer.
+	notificationService := outbound.NewMockNotificationService(logger)
+	bookingService := orchestration.NewBookingService(reservationService, paymentService, notificationService)
+
+	// Register cross-context event handlers.
+	eventHandlers := orchestration.NewEventHandlers(bookingService, reservationService, paymentService)
+	if err := eventHandlers.RegisterHandlers(ctx, dispatcher); err != nil {
+		logger.Error("failed to register event handlers", "error", err)
+		os.Exit(1)
+	}
 
 	// Create a new service with the configuration.
 	mux := inbound.Route(ctx, efs, logger, reservationService)
