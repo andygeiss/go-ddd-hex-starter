@@ -29,7 +29,7 @@ go test -v -run TestFunctionName ./internal/domain/reservation/...
 
 | Layer | Path | Purpose |
 |-------|------|---------|
-| Entry | `cmd/server/main.go` | DI wiring, bootstrap |
+| Entry | `cmd/server/main.go` | DI wiring, bootstrap, MCP server |
 | Shared Kernel | `internal/domain/shared/` | Cross-context types (Money, ReservationID) |
 | Reservation Context | `internal/domain/reservation/` | Reservation aggregate, service, events |
 | Payment Context | `internal/domain/payment/` | Payment aggregate, service, events |
@@ -1032,6 +1032,11 @@ func main() {
     // HTTP routing
     mux := inbound.Route(ctx, efs, logger, reservationService)
 
+    // MCP endpoint for AI tool integration
+    mcpServer := buildMCPServer()
+    mcpHandler := web.NewMCPHandler(mcpServer)
+    mux.Handle("POST /mcp", logging.WithLogging(logger, mcpHandler.Handler()))
+
     // Start server
     srv := web.NewServer(mux)
     defer srv.Close()
@@ -1045,15 +1050,82 @@ func main() {
 
 ---
 
-## 7. Dependencies
+## 7. MCP Integration
+
+### Model Context Protocol (MCP) Endpoint
+
+The application exposes an MCP endpoint for AI tool integration at `POST /mcp`.
+
+**Location**: `cmd/server/main.go`
+
+```go
+// buildMCPServer creates the MCP server with all tools registered.
+func buildMCPServer() *mcp.Server {
+    server := mcp.NewServer(
+        security.ParseStringOrDefault("APP_SHORTNAME", "mcp-server"),
+        security.ParseStringOrDefault("APP_VERSION", "1.0.0"),
+    )
+    // TODO: register MCP tools here
+    // server.RegisterTool(tool)
+    return server
+}
+```
+
+**Wiring in main()**:
+```go
+// MCP endpoint for AI tool integration
+mcpServer := buildMCPServer()
+mcpHandler := web.NewMCPHandler(mcpServer)
+mux.Handle("POST /mcp", logging.WithLogging(logger, mcpHandler.Handler()))
+```
+
+### Testing the MCP Endpoint
+
+```bash
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+### Adding MCP Tools
+
+Tools are registered in `buildMCPServer()` using the cloud-native-utils MCP package:
+
+```go
+func buildMCPServer() *mcp.Server {
+    server := mcp.NewServer("hotel-booking-mcp", "1.0.0")
+
+    // Example: List reservations tool
+    schema := mcp.NewObjectSchema(
+        map[string]mcp.Property{
+            "guest_id": mcp.NewStringProperty("Guest ID (email)"),
+        },
+        []string{"guest_id"},
+    )
+
+    handler := func(ctx context.Context, params mcp.ToolsCallParams) (mcp.ToolsCallResult, error) {
+        guestID, _ := params.Arguments["guest_id"].(string)
+        // Call reservation service...
+        return mcp.ToolsCallResult{
+            Content: []mcp.ContentBlock{mcp.NewTextContent("result")},
+        }, nil
+    }
+
+    server.RegisterTool(mcp.NewTool("list_reservations", "List guest reservations", schema, handler))
+    return server
+}
+```
+
+---
+
+## 8. Dependencies
 
 ### External Libraries
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `github.com/andygeiss/cloud-native-utils` | v0.5.0 | Logging, messaging, web (security/http), templating |
+| `github.com/andygeiss/cloud-native-utils` | v0.5.1 | Logging, messaging, web (security/http), templating, MCP |
 | `github.com/jackc/pgx/v5` | v5.x | PostgreSQL driver |
-| `github.com/google/uuid` | v1.6.0 | UUID generation |
 
 ### Infrastructure
 

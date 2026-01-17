@@ -62,6 +62,7 @@ This repository provides a reference implementation for structuring Go applicati
 - **Production-Ready Docker** — Multi-stage build with PGO optimization
 - **Progressive Web App** — Service worker, manifest, and offline support
 - **Saga Pattern** — Event-driven booking workflow with compensation on failure
+- **MCP Integration** — Model Context Protocol endpoint for AI tool integration
 
 ---
 
@@ -369,6 +370,19 @@ Once the application is running:
 | `/ui/reservations/{id}` | GET | Reservation detail |
 | `/ui/reservations/{id}/cancel` | POST | Cancel reservation |
 | `/ui/error` | GET | Error page (query params: title, message, details) |
+| `/mcp` | POST | MCP JSON-RPC endpoint for AI tools |
+
+### MCP Endpoint
+
+The application exposes an MCP (Model Context Protocol) endpoint for AI tool integration:
+
+```bash
+curl -X POST http://localhost:8080/mcp \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+```
+
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md#7-mcp-integration) for details on adding custom tools.
 
 ---
 

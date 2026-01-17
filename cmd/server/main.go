@@ -8,7 +8,9 @@ import (
 	"os"
 
 	"github.com/andygeiss/cloud-native-utils/logging"
+	"github.com/andygeiss/cloud-native-utils/mcp"
 	"github.com/andygeiss/cloud-native-utils/messaging"
+	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/service"
 	"github.com/andygeiss/cloud-native-utils/web"
 	"github.com/andygeiss/hotel-booking/internal/adapters/inbound"
@@ -20,6 +22,17 @@ import (
 
 //go:embed assets
 var efs embed.FS
+
+// buildMCPServer creates the MCP server with all tools registered.
+func buildMCPServer() *mcp.Server {
+	server := mcp.NewServer(
+		security.ParseStringOrDefault("APP_SHORTNAME", "mcp-server"),
+		security.ParseStringOrDefault("APP_VERSION", "1.0.0"),
+	)
+	// TODO: register MCP tools here
+	// server.RegisterTool(tool)
+	return server
+}
 
 func main() {
 	// Create a new context with a cancel function.
@@ -66,6 +79,12 @@ func main() {
 
 	// Create a new service with the configuration.
 	mux := inbound.Route(ctx, efs, logger, reservationService)
+
+	// Add MCP endpoint for AI tool integration.
+	mcpServer := buildMCPServer()
+	mcpHandler := web.NewMCPHandler(mcpServer)
+	mux.Handle("POST /mcp", logging.WithLogging(logger, mcpHandler.Handler()))
+
 	srv := web.NewServer(mux)
 	defer func() { _ = srv.Close() }()
 
