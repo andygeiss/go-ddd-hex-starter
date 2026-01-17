@@ -4,9 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/andygeiss/cloud-native-utils/redirecting"
-	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
+	"github.com/andygeiss/cloud-native-utils/web"
 )
 
 // HttpViewIndexResponse specifies the view data.
@@ -36,10 +35,10 @@ func HttpViewIndex(e *templating.Engine) http.HandlerFunc {
 		// We check both sessionID and email because:
 		// - sessionID might exist (from cookie) even after logout
 		// - email being empty indicates the session was deleted server-side
-		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
-		email, _ := ctx.Value(security.ContextEmail).(string)
+		sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+		email, _ := ctx.Value(web.ContextEmail).(string)
 		if sessionID == "" || email == "" {
-			redirecting.Redirect(w, r, "/ui/login")
+			http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 			return
 		}
 
@@ -47,12 +46,12 @@ func HttpViewIndex(e *templating.Engine) http.HandlerFunc {
 		data := HttpViewIndexResponse{
 			AppName:   appName,
 			Email:     email,
-			Issuer:    ctx.Value(security.ContextIssuer).(string),
-			Name:      ctx.Value(security.ContextName).(string),
+			Issuer:    ctx.Value(web.ContextIssuer).(string),
+			Name:      ctx.Value(web.ContextName).(string),
 			SessionID: sessionID,
-			Subject:   ctx.Value(security.ContextSubject).(string),
+			Subject:   ctx.Value(web.ContextSubject).(string),
 			Title:     title,
-			Verified:  ctx.Value(security.ContextVerified).(bool),
+			Verified:  ctx.Value(web.ContextVerified).(bool),
 		}
 
 		// Render the template using the provided engine and data.

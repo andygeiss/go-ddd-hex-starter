@@ -5,9 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/andygeiss/cloud-native-utils/redirecting"
-	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
+	"github.com/andygeiss/cloud-native-utils/web"
 	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 	"github.com/andygeiss/hotel-booking/internal/domain/shared"
 	"github.com/google/uuid"
@@ -60,14 +59,14 @@ func HttpViewReservationForm(e *templating.Engine) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
-		email, _ := ctx.Value(security.ContextEmail).(string)
+		sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+		email, _ := ctx.Value(web.ContextEmail).(string)
 		if sessionID == "" || email == "" {
-			redirecting.Redirect(w, r, "/ui/login")
+			http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 			return
 		}
 
-		name, _ := ctx.Value(security.ContextName).(string)
+		name, _ := ctx.Value(web.ContextName).(string)
 
 		data := HttpViewReservationFormResponse{
 			Rooms:      getDefaultRooms(),
@@ -140,10 +139,10 @@ func HttpCreateReservation(e *templating.Engine, reservationService *reservation
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
-		email, _ := ctx.Value(security.ContextEmail).(string)
+		sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+		email, _ := ctx.Value(web.ContextEmail).(string)
 		if sessionID == "" || email == "" {
-			redirecting.Redirect(w, r, "/ui/login")
+			http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 			return
 		}
 
@@ -163,7 +162,7 @@ func HttpCreateReservation(e *templating.Engine, reservationService *reservation
 			return
 		}
 
-		redirecting.Redirect(w, r, "/ui/reservations")
+		http.Redirect(w, r, "/ui/reservations", http.StatusSeeOther)
 	}
 }
 

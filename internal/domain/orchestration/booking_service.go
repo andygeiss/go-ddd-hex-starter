@@ -160,6 +160,7 @@ func (s *BookingService) OnPaymentFailed(ctx context.Context, reservationID shar
 	return s.reservationService.CancelReservation(ctx, reservationID, reason)
 }
 
+// createReservationStep is a helper function to encapsulate.
 func (s *BookingService) createReservationStep(
 	ctx context.Context,
 	reservationID shared.ReservationID,
@@ -176,6 +177,7 @@ func (s *BookingService) createReservationStep(
 	return res, nil
 }
 
+// authorizePaymentStep is a helper function to encapsulate.
 func (s *BookingService) authorizePaymentStep(
 	ctx context.Context,
 	paymentID payment.PaymentID,
@@ -194,6 +196,7 @@ func (s *BookingService) authorizePaymentStep(
 	return pay, nil
 }
 
+// capturePaymentStep is a helper function to encapsulate.
 func (s *BookingService) capturePaymentStep(ctx context.Context, paymentID payment.PaymentID, reservationID shared.ReservationID) error {
 	captureErr := s.paymentService.CapturePayment(ctx, paymentID)
 	if captureErr != nil {
@@ -206,6 +209,7 @@ func (s *BookingService) capturePaymentStep(ctx context.Context, paymentID payme
 	return nil
 }
 
+// confirmReservationStep is a helper function to encapsulate.
 func (s *BookingService) confirmReservationStep(ctx context.Context, reservationID shared.ReservationID, paymentID payment.PaymentID) error {
 	confirmErr := s.reservationService.ConfirmReservation(ctx, reservationID)
 	if confirmErr != nil {

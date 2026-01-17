@@ -9,8 +9,8 @@ import (
 
 	"github.com/andygeiss/cloud-native-utils/logging"
 	"github.com/andygeiss/cloud-native-utils/messaging"
-	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/service"
+	"github.com/andygeiss/cloud-native-utils/web"
 	"github.com/andygeiss/hotel-booking/internal/adapters/inbound"
 	"github.com/andygeiss/hotel-booking/internal/adapters/outbound"
 	"github.com/andygeiss/hotel-booking/internal/domain/orchestration"
@@ -66,7 +66,7 @@ func main() {
 
 	// Create a new service with the configuration.
 	mux := inbound.Route(ctx, efs, logger, reservationService)
-	srv := security.NewServer(mux)
+	srv := web.NewServer(mux)
 	defer func() { _ = srv.Close() }()
 
 	// Register the server shutdown function on the context done function.
@@ -76,7 +76,7 @@ func main() {
 		_ = srv.Shutdown(context.Background())
 	})
 
-	// The server implementation from the cloud-native-utils/security package uses
+	// The server implementation from the cloud-native-utils/web package uses
 	// It uses the PORT environment variable to determine the port to listen on.
 	// If the PORT environment variable is not set, it defaults to port 8080.
 	logger.Info("server initialized", "port", os.Getenv("PORT"))

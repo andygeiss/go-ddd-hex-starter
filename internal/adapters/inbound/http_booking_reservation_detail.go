@@ -4,9 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/andygeiss/cloud-native-utils/redirecting"
-	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
+	"github.com/andygeiss/cloud-native-utils/web"
 	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 	"github.com/andygeiss/hotel-booking/internal/domain/shared"
 )
@@ -75,10 +74,10 @@ func HttpViewReservationDetail(e *templating.Engine, reservationService *reserva
 	return func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 
-		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
-		email, _ := ctx.Value(security.ContextEmail).(string)
+		sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+		email, _ := ctx.Value(web.ContextEmail).(string)
 		if sessionID == "" || email == "" {
-			redirecting.Redirect(w, r, "/ui/login")
+			http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 			return
 		}
 
@@ -116,8 +115,8 @@ func HttpCancelReservation(reservationService *reservation.Service) http.Handler
 		ctx := r.Context()
 
 		// Check authentication
-		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
-		email, _ := ctx.Value(security.ContextEmail).(string)
+		sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+		email, _ := ctx.Value(web.ContextEmail).(string)
 		if sessionID == "" || email == "" {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -150,6 +149,12 @@ func HttpCancelReservation(reservationService *reservation.Service) http.Handler
 		}
 
 		// Redirect back to reservations list
-		redirecting.Redirect(w, r, "/ui/reservations")
+		// Use HX-Redirect header for HTMX requests to trigger a full page navigation
+		if r.Header.Get("HX-Request") == "true" {
+			w.Header().Set("HX-Redirect", "/ui/reservations")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, "/ui/reservations", http.StatusSeeOther)
 	}
 }

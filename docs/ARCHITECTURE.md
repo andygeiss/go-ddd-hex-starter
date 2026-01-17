@@ -776,8 +776,8 @@ func HttpViewReservations(e *templating.Engine, reservationService *reservation.
     return func(w http.ResponseWriter, r *http.Request) {
         ctx := r.Context()
 
-        sessionID, _ := ctx.Value(security.ContextSessionID).(string)
-        email, _ := ctx.Value(security.ContextEmail).(string)
+        sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+        email, _ := ctx.Value(web.ContextEmail).(string)
         if sessionID == "" || email == "" {
             redirecting.Redirect(w, r, "/ui/login")
             return
@@ -856,7 +856,7 @@ func HttpViewError(e *templating.Engine) http.HandlerFunc {
 func Route(ctx context.Context, efs fs.FS, logger *slog.Logger,
            reservationService *reservation.Service) *http.ServeMux {
 
-    mux, serverSessions := security.NewServeMux(ctx, efs)
+    mux, serverSessions := web.NewServeMux(ctx, efs)
     e := templating.NewEngine(efs)
     e.Parse("assets/templates/*.tmpl")
 
@@ -867,7 +867,7 @@ func Route(ctx context.Context, efs fs.FS, logger *slog.Logger,
     // Protected endpoints
     mux.HandleFunc("GET /ui/reservations",
         logging.WithLogging(logger,
-            security.WithAuth(serverSessions,
+            web.WithAuth(serverSessions,
                 HttpViewReservations(e, reservationService))))
 
     return mux
@@ -1033,7 +1033,7 @@ func main() {
     mux := inbound.Route(ctx, efs, logger, reservationService)
 
     // Start server
-    srv := security.NewServer(mux)
+    srv := web.NewServer(mux)
     defer srv.Close()
 
     logger.Info("server initialized", "port", os.Getenv("PORT"))
@@ -1051,7 +1051,7 @@ func main() {
 
 | Package | Version | Purpose |
 |---------|---------|---------|
-| `github.com/andygeiss/cloud-native-utils` | v0.4.18 | Logging, messaging, security, templating |
+| `github.com/andygeiss/cloud-native-utils` | v0.5.0 | Logging, messaging, web (security/http), templating |
 | `github.com/jackc/pgx/v5` | v5.x | PostgreSQL driver |
 | `github.com/google/uuid` | v1.6.0 | UUID generation |
 

@@ -11,8 +11,8 @@ import (
 
 	"github.com/andygeiss/cloud-native-utils/assert"
 	"github.com/andygeiss/cloud-native-utils/messaging"
-	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
+	"github.com/andygeiss/cloud-native-utils/web"
 	"github.com/andygeiss/hotel-booking/internal/adapters/inbound"
 	"github.com/andygeiss/hotel-booking/internal/adapters/outbound"
 	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
@@ -54,12 +54,12 @@ func createTestReservation(id, guestEmail, roomID string, checkIn, checkOut time
 
 func addAuthContext(req *http.Request, sessionID, email string) *http.Request {
 	ctx := req.Context()
-	ctx = context.WithValue(ctx, security.ContextSessionID, sessionID)
-	ctx = context.WithValue(ctx, security.ContextEmail, email)
-	ctx = context.WithValue(ctx, security.ContextIssuer, "https://issuer.example.com")
-	ctx = context.WithValue(ctx, security.ContextName, "Test User")
-	ctx = context.WithValue(ctx, security.ContextSubject, "user-subject-456")
-	ctx = context.WithValue(ctx, security.ContextVerified, true)
+	ctx = context.WithValue(ctx, web.ContextSessionID, sessionID)
+	ctx = context.WithValue(ctx, web.ContextEmail, email)
+	ctx = context.WithValue(ctx, web.ContextIssuer, "https://issuer.example.com")
+	ctx = context.WithValue(ctx, web.ContextName, "Test User")
+	ctx = context.WithValue(ctx, web.ContextSubject, "user-subject-456")
+	ctx = context.WithValue(ctx, web.ContextVerified, true)
 	return req.WithContext(ctx)
 }
 

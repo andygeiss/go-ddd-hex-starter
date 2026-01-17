@@ -4,9 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/andygeiss/cloud-native-utils/redirecting"
-	"github.com/andygeiss/cloud-native-utils/security"
 	"github.com/andygeiss/cloud-native-utils/templating"
+	"github.com/andygeiss/cloud-native-utils/web"
 	"github.com/andygeiss/hotel-booking/internal/domain/reservation"
 )
 
@@ -39,10 +38,10 @@ func HttpViewReservations(e *templating.Engine, reservationService *reservation.
 		ctx := r.Context()
 
 		// Check authentication
-		sessionID, _ := ctx.Value(security.ContextSessionID).(string)
-		email, _ := ctx.Value(security.ContextEmail).(string)
+		sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+		email, _ := ctx.Value(web.ContextEmail).(string)
 		if sessionID == "" || email == "" {
-			redirecting.Redirect(w, r, "/ui/login")
+			http.Redirect(w, r, "/ui/login", http.StatusSeeOther)
 			return
 		}
 
