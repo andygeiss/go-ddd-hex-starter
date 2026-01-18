@@ -1,359 +1,371 @@
-# Hotel Booking - Architecture & Development Guide
+# Hotel Booking System - Architecture Documentation
 
-> **Purpose**: Agent-friendly documentation capturing all architectural decisions, patterns, conventions, and recipes for this hotel reservation and payment management system built with Go, Hexagonal Architecture, and Domain-Driven Design.
+A hotel reservation and payment management system built with Go, Hexagonal Architecture, and Domain-Driven Design (DDD).
 
----
+## Table of Contents
 
-## Quick Reference
-
-### Commands
-
-| Command | Purpose |
-|---------|---------|
-| `just setup` | Install dev tools (docker-compose, golangci-lint, just, podman) |
-| `just up` | Build image + start PostgreSQL, Keycloak, Kafka, and app |
-| `just down` | Stop and remove all containers |
-| `just test` | Run unit tests with coverage (outputs `.coverage.pprof`) |
-| `just test-integration` | Run integration tests (requires external services) |
-| `just lint` | Run golangci-lint (read-only check) |
-| `just fmt` | Format code with golangci-lint |
-| `just profile` | Generate CPU profile for PGO optimization |
-
-### Run Single Test
-
-```bash
-go test -v -run TestFunctionName ./internal/domain/reservation/...
-```
-
-### Critical Paths
-
-| Layer | Path | Purpose |
-|-------|------|---------|
-| Entry | `cmd/server/main.go` | DI wiring, bootstrap, MCP server |
-| Shared Kernel | `internal/domain/shared/` | Cross-context types (Money, ReservationID) |
-| Reservation Context | `internal/domain/reservation/` | Reservation aggregate, service, events |
-| Payment Context | `internal/domain/payment/` | Payment aggregate, service, events |
-| Orchestration | `internal/domain/orchestration/` | Saga coordination, event handlers |
-| Inbound | `internal/adapters/inbound/` | HTTP handlers, event subscribers |
-| Outbound | `internal/adapters/outbound/` | PostgreSQL repositories, gateways, publishers |
+1. [Overview](#overview)
+2. [Technology Stack](#technology-stack)
+3. [Architecture Principles](#architecture-principles)
+4. [Project Structure](#project-structure)
+5. [Bounded Contexts](#bounded-contexts)
+6. [Domain Layer](#domain-layer)
+7. [Application Layer (Orchestration)](#application-layer-orchestration)
+8. [Adapter Layer](#adapter-layer)
+9. [Event-Driven Communication](#event-driven-communication)
+10. [Saga Pattern Implementation](#saga-pattern-implementation)
+11. [Database Design](#database-design)
+12. [API Design](#api-design)
+13. [Testing Strategy](#testing-strategy)
+14. [Conventions and Patterns](#conventions-and-patterns)
+15. [Recipes](#recipes)
+16. [Infrastructure](#infrastructure)
+17. [Security](#security)
+18. [Deployment](#deployment)
 
 ---
 
-## 1. Architecture Overview
+## Overview
 
-### Hexagonal Architecture (Ports & Adapters) with Bounded Contexts
+This system manages hotel room reservations and associated payments. It demonstrates:
 
-```
-                    ┌─────────────────────────────────────────┐
-                    │            Entry Point                  │
-                    │         cmd/server/main.go              │
-                    │      (DI wiring, bootstrap)             │
-                    └─────────────────┬───────────────────────┘
-                                      │
-         ┌────────────────────────────┼────────────────────────────┐
-         │                            │                            │
-         ▼                            ▼                            ▼
-┌─────────────────┐          ┌─────────────────┐          ┌──────────────────┐
-│ Inbound Adapter │          │  Domain Layer   │          │Outbound Adapter  │
-│  (HTTP, Events) │─────────▶│ (Bounded Ctxs)  │◀─────────│ (Repos, Gateways)│
-│                 │          │                 │          │                  │
-│ implements      │          │   defines       │          │ implements       │
-│ domain ports    │          │   ports         │          │ domain ports     │
-└─────────────────┘          └─────────────────┘          └──────────────────┘
-                                      │
-                    ┌─────────────────┴──────────────┐
-                    │                                │
-         ┌──────────┴──────────┐                     │
-         │                     │                     │
-         ▼                     ▼                     ▼
-┌─────────────────┐   ┌─────────────────┐   ┌─────────────────┐
-│   Reservation   │   │     Payment     │   │  Orchestration  │
-│    Context      │   │     Context     │   │     Layer       │
-│                 │   │                 │   │                 │
-│ aggregate.go    │   │ aggregate.go    │   │ booking_svc.go  │
-│ service.go      │   │ service.go      │   │ event_handlers  │
-│ events.go       │   │ events.go       │   │                 │
-└─────────────────┘   └─────────────────┘   └─────────────────┘
-         │                     │                     │
-         └─────────────────────┴─────────────────────┘
-                               │
-                    ┌──────────┴──────────┐
-                    │    Shared Kernel    │
-                    │  (Money, IDs)       │
-                    └─────────────────────┘
-```
+- **Hexagonal Architecture** (Ports & Adapters) for clean separation of concerns
+- **Domain-Driven Design** with bounded contexts and aggregates
+- **Event-Driven Architecture** using Kafka for cross-context communication
+- **Saga Pattern** for distributed transaction coordination
+- **Database-per-Context** for true microservice isolation
 
-### Bounded Contexts
+### System Capabilities
 
-The domain is split into three bounded contexts with clear responsibilities:
-
-| Context | Purpose | Key Aggregates |
-|---------|---------|----------------|
-| **Reservation** | Room booking lifecycle | `Reservation` |
-| **Payment** | Payment processing | `Payment` |
-| **Orchestration** | Cross-context coordination | Saga coordination |
-
-### Event-Driven Communication
-
-Bounded contexts communicate via domain events through Kafka:
-
-```
-┌─────────────────┐     reservation.created      ┌─────────────────┐
-│   Reservation   │ ─────────────────────────▶   │     Payment     │
-│    Context      │                              │     Context     │
-└─────────────────┘                              └─────────────────┘
-                                                          │
-                        payment.authorized                │
-         ┌────────────────────────────────────────────────┘
-         │
-         ▼
-┌─────────────────┐     payment.captured         ┌─────────────────┐
-│  Orchestration  │ ─────────────────────────▶   │   Reservation   │
-│     Layer       │                              │     Context     │
-└─────────────────┘                              └─────────────────┘
-```
-
-**Event Topics:**
-- `reservation.created` - Payment context subscribes to authorize payment
-- `reservation.confirmed` - Notification context subscribes
-- `reservation.cancelled` - Notification context subscribes
-- `payment.authorized` - Orchestration subscribes to capture payment
-- `payment.captured` - Reservation context subscribes to confirm reservation
-- `payment.failed` - Orchestration subscribes for compensation
-
-### Dependency Rule
-
-- **Domain layer has ZERO infrastructure imports**
-- Adapters import domain; domain never imports adapters
-- All external dependencies injected via interfaces (ports)
-- DI wiring happens only in `main.go`
-- Bounded contexts communicate only via events (no direct calls)
-
-### File Organization
-
-```
-internal/domain/
-├── shared/
-│   └── types.go                    # Cross-context types (Money, ReservationID)
-├── reservation/
-│   ├── aggregate.go                # Reservation aggregate + value objects + errors
-│   ├── entities.go                 # DateRange, GuestInfo value objects
-│   ├── ports.go                    # Repository, AvailabilityChecker interfaces
-│   ├── events.go                   # EventCreated, EventConfirmed, EventCancelled
-│   └── service.go                  # ReservationService
-├── payment/
-│   ├── aggregate.go                # Payment aggregate + status + errors
-│   ├── entities.go                 # PaymentAttempt entity
-│   ├── ports.go                    # Repository, PaymentGateway interfaces
-│   ├── events.go                   # EventAuthorized, EventCaptured, EventFailed
-│   └── service.go                  # PaymentService
-└── orchestration/
-    ├── booking_service.go          # Saga coordinator
-    ├── event_handlers.go           # Cross-context event subscriptions
-    └── ports.go                    # NotificationService interface
-
-internal/adapters/inbound/
-├── router.go                       # HTTP routing + middleware composition
-├── http_{feature}.go               # HTTP handler for feature
-├── http_{feature}_test.go          # Handler tests
-├── http_error.go                   # Error page handler
-└── event_subscriber.go             # Event subscription handler
-
-internal/adapters/outbound/
-├── postgres_connection.go          # PostgreSQL connection helper
-├── postgres_reservation_repository.go  # PostgreSQL reservation repository
-├── postgres_payment_repository.go      # PostgreSQL payment repository
-├── repository_{checker}.go         # Composite adapter
-├── mock_{service}.go               # Mock adapter (for prod/test)
-├── mock_{service}_test.go
-└── event_publisher.go              # Event publishing adapter
-
-migrations/
-└── init.sql                        # PostgreSQL schema
-```
+- Create, view, and cancel room reservations
+- Authorization-Capture payment processing workflow
+- Automatic payment processing triggered by domain events
+- Compensation logic for handling failures
+- PWA support for mobile-first experience
+- MCP (Model Context Protocol) endpoint for AI tool integration
 
 ---
 
-## 2. Domain Layer Patterns
+## Technology Stack
 
-### 2.1 Shared Kernel
+| Component | Technology | Purpose |
+|-----------|------------|---------|
+| Language | Go 1.25.5 | Application runtime |
+| Architecture | Hexagonal + DDD | Clean separation, domain focus |
+| Web Framework | `net/http` stdlib | HTTP server and routing |
+| Frontend | HTML + HTMX | Interactive UI without JavaScript frameworks |
+| Authentication | Keycloak (OIDC) | OAuth2/OpenID Connect provider |
+| Database | PostgreSQL 16 | Persistent storage (one per context) |
+| Message Broker | Apache Kafka | Event streaming between contexts |
+| Containerization | Docker/Podman | Deployment and local development |
+| Task Runner | Just | Build automation |
 
-**Pattern**: Common types shared across bounded contexts.
-
-**Location**: `internal/domain/shared/types.go`
+### Core Dependencies
 
 ```go
-package shared
+require (
+    github.com/andygeiss/cloud-native-utils v0.5.5  // Logging, messaging, web, templating, MCP
+    github.com/jackc/pgx/v5 v5.8.0                  // PostgreSQL driver
+)
+```
 
-// ReservationID is shared across reservation and payment contexts
+### Indirect Dependencies
+
+- `coreos/go-oidc/v3` - OIDC client for Keycloak integration
+- `segmentio/kafka-go` - Kafka client for event messaging
+- `klauspost/compress`, `pierrec/lz4` - Compression for Kafka
+
+---
+
+## Architecture Principles
+
+### Hexagonal Architecture (Ports & Adapters)
+
+The architecture enforces strict layering with dependency inversion:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     Inbound Adapters                        │
+│           (HTTP Handlers, Event Subscribers)                │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Inbound Ports                          │
+│              (Interfaces defined in Domain)                 │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                      Domain Layer                           │
+│    (Aggregates, Entities, Value Objects, Domain Events)     │
+│                    ZERO INFRASTRUCTURE IMPORTS              │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     Outbound Ports                          │
+│              (Interfaces defined in Domain)                 │
+└─────────────────────────────┬───────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                    Outbound Adapters                        │
+│      (Repository Implementations, Payment Gateway,          │
+│       Event Publishers, Notification Services)              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Key Architectural Rules
+
+1. **Domain has no infrastructure dependencies** - The domain layer imports only the standard library and the shared kernel
+2. **Dependencies point inward** - Adapters depend on domain, never the reverse
+3. **Interfaces are defined by consumers** - Ports are defined in the domain, implemented in adapters
+4. **One aggregate per transaction** - Each repository operation affects only one aggregate
+
+---
+
+## Project Structure
+
+```
+hotel-booking/
+├── cmd/
+│   └── server/
+│       ├── main.go                 # Application entry point, DI wiring
+│       └── assets/
+│           ├── static/             # CSS, JS (HTMX), images
+│           └── templates/          # HTML templates (*.tmpl)
+├── internal/
+│   ├── adapters/
+│   │   ├── inbound/                # HTTP handlers, event subscribers
+│   │   │   ├── router.go           # HTTP route definitions
+│   │   │   ├── http_*.go           # HTTP handler implementations
+│   │   │   └── event_subscriber.go # Event subscription adapter
+│   │   └── outbound/               # Repository implementations, gateways
+│   │       ├── event_publisher.go
+│   │       ├── repository_availability_checker.go
+│   │       ├── mock_payment_gateway.go
+│   │       └── mock_notification_service.go
+│   └── domain/
+│       ├── shared/                 # Shared Kernel
+│       │   └── types.go            # ReservationID, Money
+│       ├── reservation/            # Reservation Bounded Context
+│       │   ├── aggregate.go        # Reservation aggregate root
+│       │   ├── entities.go         # DateRange, GuestInfo
+│       │   ├── ports.go            # Repository, AvailabilityChecker interfaces
+│       │   ├── events.go           # Domain events
+│       │   └── service.go          # Application service
+│       ├── payment/                # Payment Bounded Context
+│       │   ├── aggregate.go        # Payment aggregate root
+│       │   ├── entities.go         # PaymentAttempt
+│       │   ├── ports.go            # Repository, PaymentGateway interfaces
+│       │   ├── events.go           # Domain events
+│       │   └── service.go          # Application service
+│       └── orchestration/          # Saga Coordination Layer
+│           ├── ports.go            # NotificationService interface
+│           ├── booking_service.go  # Booking workflow orchestration
+│           └── event_handlers.go   # Cross-context event handlers
+├── migrations/
+│   ├── reservation/init.sql        # Reservation database schema
+│   └── payment/init.sql            # Payment database schema
+├── docker-compose.yml              # Development stack
+├── Dockerfile                      # Production build
+├── go.mod                          # Go module definition
+└── .justfile                       # Task runner commands
+```
+
+---
+
+## Bounded Contexts
+
+The system is divided into three bounded contexts, each with clear responsibilities:
+
+### 1. Reservation Context
+
+**Purpose:** Manages the complete reservation lifecycle
+
+**Aggregate Root:** `Reservation`
+
+**Responsibilities:**
+- Room availability checking
+- Reservation creation with validation
+- State transitions (pending → confirmed → active → completed)
+- Cancellation with business rules
+- Guest information management
+
+**Database:** `reservation_db` (port 5432)
+
+### 2. Payment Context
+
+**Purpose:** Handles all payment processing
+
+**Aggregate Root:** `Payment`
+
+**Responsibilities:**
+- Payment authorization (two-phase commit)
+- Payment capture
+- Refund processing
+- Payment attempt tracking
+- Transaction ID management
+
+**Database:** `payment_db` (port 5433)
+
+### 3. Orchestration Context
+
+**Purpose:** Coordinates workflows across bounded contexts
+
+**Key Components:** `BookingService`, `EventHandlers`
+
+**Responsibilities:**
+- Booking saga coordination
+- Event subscription and routing
+- Compensation logic on failures
+- Notification triggering
+
+**Database:** None (stateless coordinator)
+
+### Shared Kernel
+
+Types shared across contexts without violating context boundaries:
+
+```go
+// internal/domain/shared/types.go
+
+// ReservationID - shared because Payment needs to reference reservations
 type ReservationID string
 
-// Money is a shared value object for currency amounts
+// Money - shared because both contexts deal with monetary values
 type Money struct {
-    Amount   int64  // Cents/smallest unit
     Currency string // ISO 4217 (e.g., "USD")
-}
-
-func NewMoney(amount int64, currency string) Money {
-    return Money{
-        Amount:   amount,
-        Currency: strings.ToUpper(currency),
-    }
-}
-
-func (m Money) FormatAmount() string {
-    dollars := float64(m.Amount) / 100
-    return fmt.Sprintf("%s %.2f", m.Currency, dollars)
+    Amount   int64  // Amount in cents
 }
 ```
-
-**Rationale**: Provides a minimal shared vocabulary between bounded contexts without tight coupling.
 
 ---
 
-### 2.2 Strong-Typed IDs
+## Domain Layer
 
-**Pattern**: Use type aliases for all entity identifiers within each context.
+### Aggregates
 
-**Location**: `internal/domain/reservation/aggregate.go:10-13`
+#### Reservation Aggregate
 
 ```go
-// Reservation context IDs
-type ReservationID = shared.ReservationID  // Alias to shared type
-type GuestID string
-type RoomID string
+// internal/domain/reservation/aggregate.go
+
+type Reservation struct {
+    ID                 ReservationID
+    GuestID            GuestID
+    RoomID             RoomID
+    DateRange          DateRange          // Value Object
+    Status             ReservationStatus  // State machine
+    TotalAmount        Money              // Shared Kernel
+    CancellationReason string
+    CreatedAt          time.Time
+    UpdatedAt          time.Time
+    Guests             []GuestInfo        // Embedded entities
+}
 ```
 
-**Location**: `internal/domain/payment/aggregate.go:10-12`
+**State Machine:**
 
-```go
-// Payment context IDs
-type PaymentID string
-type ReservationID = shared.ReservationID  // Alias to shared type
+```
+┌─────────┐     Confirm()      ┌───────────┐     Activate()     ┌────────┐     Complete()    ┌───────────┐
+│ pending │──────────────────► │ confirmed │───────────────────►│ active │─────────────────►│ completed │
+└────┬────┘                    └─────┬─────┘                    └────────┘                   └───────────┘
+     │                               │
+     │ Cancel()                      │ Cancel()
+     ▼                               ▼
+┌───────────┐                  ┌───────────┐
+│ cancelled │◄─────────────────│ cancelled │
+└───────────┘                  └───────────┘
 ```
 
-**Rationale**: Prevents accidental parameter swapping, improves readability, enables type-safe method signatures. ReservationID is shared because it's referenced across contexts.
+**Business Rules:**
+- Minimum 1 night stay required
+- Check-in must be in the future
+- Cannot cancel within 24 hours of check-in
+- At least one guest required
+- Cancelled reservations do not block availability
 
----
-
-### 2.3 Value Objects
-
-**Pattern**: Immutable structs with factory functions, defined per context.
-
-**Location**: `internal/domain/reservation/entities.go`
+#### Payment Aggregate
 
 ```go
+// internal/domain/payment/aggregate.go
+
+type Payment struct {
+    ID            PaymentID
+    ReservationID ReservationID      // Cross-context reference (not FK)
+    Amount        Money
+    Status        PaymentStatus
+    PaymentMethod string
+    TransactionID string             // External gateway reference
+    CreatedAt     time.Time
+    UpdatedAt     time.Time
+    Attempts      []PaymentAttempt   // Embedded entities
+}
+```
+
+**State Machine (Authorization-Capture Pattern):**
+
+```
+┌─────────┐    Authorize()    ┌────────────┐    Capture()    ┌──────────┐
+│ pending │──────────────────►│ authorized │────────────────►│ captured │
+└────┬────┘                   └─────┬──────┘                 └────┬─────┘
+     │                              │                              │
+     │ Fail()                       │ Fail()                       │ Refund()
+     ▼                              ▼                              ▼
+┌────────┐                    ┌────────┐                     ┌──────────┐
+│ failed │◄───────────────────│ failed │                     │ refunded │
+└────────┘                    └────────┘                     └──────────┘
+```
+
+**Business Rules:**
+- Authorization required before capture
+- Only captured payments can be refunded
+- Maximum 3 retry attempts for failed payments
+
+### Value Objects
+
+```go
+// DateRange - immutable date period
 type DateRange struct {
     CheckIn  time.Time
     CheckOut time.Time
 }
 
-func NewDateRange(checkIn, checkOut time.Time) DateRange {
-    return DateRange{CheckIn: checkIn, CheckOut: checkOut}
-}
-
+// GuestInfo - guest details within reservation
 type GuestInfo struct {
     Name        string
     Email       string
     PhoneNumber string
 }
 
-func NewGuestInfo(name, email, phone string) GuestInfo {
-    return GuestInfo{Name: name, Email: email, PhoneNumber: phone}
+// PaymentAttempt - payment processing history
+type PaymentAttempt struct {
+    AttemptedAt time.Time
+    Status      PaymentStatus
+    ErrorCode   string
+    ErrorMsg    string
 }
 ```
 
----
+### Strongly-Typed Identifiers
 
-### 2.4 Aggregate Roots
-
-**Pattern**: Entity with identity, embedded entities, state machine, and business methods.
-
-**Location**: `internal/domain/reservation/aggregate.go`
+All entity identifiers use type aliases to prevent accidental mixing:
 
 ```go
-type Reservation struct {
-    ID                 ReservationID
-    GuestID            GuestID
-    RoomID             RoomID
-    DateRange          DateRange
-    Status             ReservationStatus
-    TotalAmount        shared.Money
-    CancellationReason string
-    CreatedAt          time.Time
-    UpdatedAt          time.Time
-    Guests             []GuestInfo  // Embedded entity collection
-}
+type ReservationID = shared.ReservationID  // Shared
+type GuestID string                         // Local to reservation context
+type RoomID string                          // Local to reservation context
+type PaymentID string                       // Local to payment context
 ```
 
-**Location**: `internal/domain/payment/aggregate.go`
+### Sentinel Errors
+
+Each context defines package-level error variables for type checking:
 
 ```go
-type Payment struct {
-    ID            PaymentID
-    ReservationID ReservationID
-    Amount        shared.Money
-    PaymentMethod string
-    Status        PaymentStatus
-    TransactionID string
-    CreatedAt     time.Time
-    UpdatedAt     time.Time
-    Attempts      []PaymentAttempt
-}
-```
-
----
-
-### 2.5 State Machine Pattern
-
-**Pattern**: Status as typed constant, transitions via methods with validation.
-
-**Location**: `internal/domain/reservation/aggregate.go`
-
-```go
-type ReservationStatus string
-
-const (
-    StatusPending   ReservationStatus = "pending"
-    StatusConfirmed ReservationStatus = "confirmed"
-    StatusActive    ReservationStatus = "active"
-    StatusCompleted ReservationStatus = "completed"
-    StatusCancelled ReservationStatus = "cancelled"
-)
-
-func (r *Reservation) Confirm() error {
-    if r.Status != StatusPending {
-        return fmt.Errorf("%w: cannot confirm from %s", ErrInvalidStateTransition, r.Status)
-    }
-    r.Status = StatusConfirmed
-    r.UpdatedAt = time.Now()
-    return nil
-}
-```
-
-**Reservation State Diagram**:
-```
-pending ──▶ confirmed ──▶ active ──▶ completed
-   │            │
-   └────────────┴──▶ cancelled
-```
-
-**Payment State Diagram** (`internal/domain/payment/aggregate.go`):
-```
-pending ──▶ authorized ──▶ captured ──▶ refunded
-   │            │
-   └────────────┴──▶ failed
-```
-
----
-
-### 2.6 Sentinel Errors
-
-**Pattern**: Package-level error variables for type checking with `errors.Is()`.
-
-**Location**: `internal/domain/reservation/aggregate.go`
-
-```go
+// Reservation errors
 var (
     ErrInvalidDateRange        = errors.New("check-out must be after check-in")
     ErrCheckInPast             = errors.New("check-in date must be in the future")
@@ -362,130 +374,589 @@ var (
     ErrCannotCancelNearCheckIn = errors.New("cannot cancel within 24 hours of check-in")
     ErrNoGuests                = errors.New("at least one guest required")
 )
-```
 
-**Location**: `internal/domain/payment/aggregate.go`
-
-```go
+// Payment errors
 var (
     ErrInvalidPaymentTransition = errors.New("invalid payment state transition")
-    ErrPaymentNotFound          = errors.New("payment not found")
-    ErrPaymentAlreadyAuthorized = errors.New("payment already authorized")
+    ErrNotAuthorized            = errors.New("payment not authorized")
+    ErrAlreadyCaptured          = errors.New("payment already captured")
+    ErrCannotRefund             = errors.New("can only refund captured payments")
 )
 ```
 
 ---
 
-### 2.7 Ports (Interfaces)
+## Application Layer (Orchestration)
 
-**Pattern**: Interfaces defined in each bounded context, implemented by adapters.
+### Domain Services
 
-**Location**: `internal/domain/reservation/ports.go`
-
-```go
-// Repository port (uses generics from cloud-native-utils)
-type ReservationRepository resource.Access[ReservationID, Reservation]
-
-// External service ports
-type AvailabilityChecker interface {
-    IsRoomAvailable(ctx context.Context, roomID RoomID, dateRange DateRange) (bool, error)
-    GetOverlappingReservations(ctx context.Context, roomID RoomID, dateRange DateRange) ([]*Reservation, error)
-}
-
-// Event publishing port
-type EventPublisher event.EventPublisher
-```
-
-**Location**: `internal/domain/payment/ports.go`
+Each bounded context has a service that orchestrates domain operations:
 
 ```go
-type PaymentRepository resource.Access[PaymentID, Payment]
+// internal/domain/reservation/service.go
 
-type PaymentGateway interface {
-    Authorize(ctx context.Context, payment *Payment) (transactionID string, err error)
-    Capture(ctx context.Context, transactionID string, amount shared.Money) error
-    Refund(ctx context.Context, transactionID string, amount shared.Money) error
-}
-
-type EventPublisher event.EventPublisher
-```
-
-**Location**: `internal/domain/orchestration/ports.go`
-
-```go
-type NotificationService interface {
-    SendReservationConfirmation(ctx context.Context, reservation *reservation.Reservation) error
-    SendCancellationNotice(ctx context.Context, reservation *reservation.Reservation, reason string) error
-    SendPaymentReceipt(ctx context.Context, payment *payment.Payment) error
-}
-```
-
----
-
-### 2.8 Domain Events
-
-**Pattern**: Events with topic method, defined per bounded context.
-
-**Location**: `internal/domain/reservation/events.go`
-
-```go
-// Event topic constants (Kafka-style naming)
-const (
-    EventTopicCreated   = "reservation.created"
-    EventTopicConfirmed = "reservation.confirmed"
-    EventTopicCancelled = "reservation.cancelled"
-)
-
-type EventCreated struct {
-    ReservationID string      `json:"reservation_id"`
-    GuestID       string      `json:"guest_id"`
-    RoomID        string      `json:"room_id"`
-    CheckIn       time.Time   `json:"check_in"`
-    CheckOut      time.Time   `json:"check_out"`
-    TotalAmount   shared.Money `json:"total_amount"`
-}
-
-func (e *EventCreated) Topic() string {
-    return EventTopicCreated
-}
-```
-
-**Location**: `internal/domain/payment/events.go`
-
-```go
-const (
-    EventTopicAuthorized = "payment.authorized"
-    EventTopicCaptured   = "payment.captured"
-    EventTopicFailed     = "payment.failed"
-    EventTopicRefunded   = "payment.refunded"
-)
-
-type EventAuthorized struct {
-    PaymentID     string `json:"payment_id"`
-    ReservationID string `json:"reservation_id"`
-    TransactionID string `json:"transaction_id"`
-}
-
-func (e *EventAuthorized) Topic() string {
-    return EventTopicAuthorized
-}
-```
-
----
-
-### 2.9 Domain Services
-
-**Pattern**: Service struct with injected ports, orchestrates business operations within a context.
-
-**Location**: `internal/domain/reservation/service.go`
-
-```go
 type Service struct {
     reservationRepo     ReservationRepository
     availabilityChecker AvailabilityChecker
     publisher           event.EventPublisher
 }
 
+func (s *Service) CreateReservation(ctx context.Context, ...) (*Reservation, error) {
+    // 1. Check room availability
+    // 2. Create aggregate with validation
+    // 3. Persist to repository
+    // 4. Publish domain event
+}
+```
+
+### Booking Service (Saga Coordinator)
+
+The `BookingService` orchestrates the complete booking workflow:
+
+```go
+// internal/domain/orchestration/booking_service.go
+
+type BookingService struct {
+    reservationService  *reservation.Service
+    paymentService      *payment.Service
+    notificationService NotificationService
+}
+```
+
+**Key Methods:**
+
+| Method | Purpose |
+|--------|---------|
+| `InitiateBooking` | Creates reservation, triggers event-driven payment flow |
+| `CompleteBooking` | Synchronous booking with all steps |
+| `OnPaymentAuthorized` | Handles payment.authorized event |
+| `OnPaymentCaptured` | Confirms reservation on successful payment |
+| `OnPaymentFailed` | Cancels reservation as compensation |
+| `CancelBookingWithRefund` | Cancels reservation and processes refund |
+
+---
+
+## Adapter Layer
+
+### Inbound Adapters
+
+#### HTTP Handlers
+
+Handler factory pattern with dependency injection:
+
+```go
+// internal/adapters/inbound/http_booking_reservations.go
+
+func HttpViewReservations(e *templating.Engine, reservationService *reservation.Service) http.HandlerFunc {
+    return func(w http.ResponseWriter, r *http.Request) {
+        ctx := r.Context()
+
+        // Extract authenticated user from context
+        sessionID, _ := ctx.Value(web.ContextSessionID).(string)
+        email, _ := ctx.Value(web.ContextEmail).(string)
+
+        // Use domain service
+        reservations, err := reservationService.ListReservationsByGuest(ctx, reservation.GuestID(email))
+
+        // Render response
+        HttpView(e, "reservations", data)(w, r)
+    }
+}
+```
+
+#### Event Subscriber
+
+Subscribes to Kafka topics and routes to domain handlers:
+
+```go
+// internal/adapters/inbound/event_subscriber.go
+
+func (es *EventSubscriber) Subscribe(ctx context.Context, topic string, factory func() event.Event, handler func(e event.Event) error) error {
+    messageFn := func(msg messaging.Message) (messaging.MessageState, error) {
+        evt := factory()
+        json.Unmarshal(msg.Data, evt)
+        handler(evt)
+        return messaging.MessageStateCompleted, nil
+    }
+    return es.dispatcher.Subscribe(ctx, topic, service.Wrap(messageFn))
+}
+```
+
+### Outbound Adapters
+
+#### Event Publisher
+
+Publishes domain events to Kafka:
+
+```go
+// internal/adapters/outbound/event_publisher.go
+
+func (ep *EventPublisher) Publish(ctx context.Context, e event.Event) error {
+    encoded, _ := json.Marshal(e)
+    msg := messaging.NewMessage(e.Topic(), encoded)
+    return ep.dispatcher.Publish(ctx, msg)
+}
+```
+
+#### Repository Availability Checker
+
+Implements `AvailabilityChecker` port using the repository:
+
+```go
+// internal/adapters/outbound/repository_availability_checker.go
+
+func (c *RepositoryAvailabilityChecker) IsRoomAvailable(ctx context.Context, roomID RoomID, dateRange DateRange) (bool, error) {
+    overlapping, _ := c.GetOverlappingReservations(ctx, roomID, dateRange)
+    return len(overlapping) == 0, nil
+}
+```
+
+#### Mock Payment Gateway
+
+Simulates external payment gateway for testing:
+
+```go
+// internal/adapters/outbound/mock_payment_gateway.go
+
+type MockPaymentGateway struct {
+    transactions map[string]shared.Money
+    FailureRate  float64  // 0.0 to 1.0
+    ShouldFail   bool     // Force failures for testing
+}
+
+func (g *MockPaymentGateway) Authorize(ctx context.Context, pay *Payment) (string, error) {
+    if g.ShouldFail || cryptoRandFloat64() < g.FailureRate {
+        return "", errors.New("payment authorization failed")
+    }
+    transactionID := fmt.Sprintf("txn_%s_%d", pay.ID, pay.Amount.Amount)
+    g.transactions[transactionID] = pay.Amount
+    return transactionID, nil
+}
+```
+
+---
+
+## Event-Driven Communication
+
+### Domain Events
+
+Events use a fluent builder pattern:
+
+```go
+// internal/domain/reservation/events.go
+
+type EventCreated struct {
+    ReservationID ReservationID `json:"reservation_id"`
+    GuestID       GuestID       `json:"guest_id"`
+    RoomID        RoomID        `json:"room_id"`
+    CheckIn       time.Time     `json:"check_in"`
+    CheckOut      time.Time     `json:"check_out"`
+    TotalAmount   Money         `json:"total_amount"`
+}
+
+func (e *EventCreated) Topic() string { return EventTopicCreated }
+
+// Fluent builder
+func NewEventCreated() *EventCreated { return &EventCreated{} }
+
+func (e *EventCreated) WithReservationID(id ReservationID) *EventCreated {
+    e.ReservationID = id
+    return e
+}
+```
+
+### Event Topics
+
+| Context | Topic | Trigger |
+|---------|-------|---------|
+| Reservation | `reservation.created` | New reservation created |
+| Reservation | `reservation.confirmed` | Payment captured |
+| Reservation | `reservation.activated` | Guest checked in |
+| Reservation | `reservation.completed` | Guest checked out |
+| Reservation | `reservation.cancelled` | Reservation cancelled |
+| Payment | `payment.authorized` | Payment authorization succeeded |
+| Payment | `payment.captured` | Payment finalized |
+| Payment | `payment.failed` | Payment processing failed |
+| Payment | `payment.refunded` | Payment refunded |
+
+### Event Flow
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────────┐
+│                              BOOKING WORKFLOW                                           │
+├─────────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                         │
+│  User                Reservation              Payment               Orchestration       │
+│   │                     │                        │                       │              │
+│   │  Create Booking     │                        │                       │              │
+│   │────────────────────►│                        │                       │              │
+│   │                     │                        │                       │              │
+│   │                     │  reservation.created   │                       │              │
+│   │                     │───────────────────────────────────────────────►│              │
+│   │                     │                        │                       │              │
+│   │                     │                        │◄──────────────────────│              │
+│   │                     │                        │   AuthorizePayment    │              │
+│   │                     │                        │                       │              │
+│   │                     │                        │  payment.authorized   │              │
+│   │                     │                        │──────────────────────►│              │
+│   │                     │                        │                       │              │
+│   │                     │                        │◄──────────────────────│              │
+│   │                     │                        │    CapturePayment     │              │
+│   │                     │                        │                       │              │
+│   │                     │                        │  payment.captured     │              │
+│   │                     │                        │──────────────────────►│              │
+│   │                     │                        │                       │              │
+│   │                     │◄───────────────────────────────────────────────│              │
+│   │                     │        ConfirmReservation                      │              │
+│   │                     │                        │                       │              │
+│   │                     │  reservation.confirmed │                       │              │
+│   │                     │──────────────────────────────────────────────►│              │
+│   │                     │                        │                       │              │
+│   │◄────────────────────│                        │    SendNotification   │              │
+│   │   Booking Complete  │                        │                       │              │
+│                                                                                         │
+└─────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Saga Pattern Implementation
+
+### Event Handlers Registration
+
+```go
+// internal/domain/orchestration/event_handlers.go
+
+func (h *EventHandlers) RegisterHandlers(ctx context.Context, dispatcher messaging.Dispatcher) error {
+    // Payment context subscribes to reservation.created
+    dispatcher.Subscribe(ctx, reservation.EventTopicCreated, service.Wrap(h.handleReservationCreated))
+
+    // Orchestration subscribes to payment.authorized
+    dispatcher.Subscribe(ctx, payment.EventTopicAuthorized, service.Wrap(h.handlePaymentAuthorized))
+
+    // Reservation context subscribes to payment.captured
+    dispatcher.Subscribe(ctx, payment.EventTopicCaptured, service.Wrap(h.handlePaymentCaptured))
+
+    // Orchestration subscribes to payment.failed for compensation
+    dispatcher.Subscribe(ctx, payment.EventTopicFailed, service.Wrap(h.handlePaymentFailed))
+
+    return nil
+}
+```
+
+### Compensation Logic
+
+When payment fails, the reservation is automatically cancelled:
+
+```go
+func (h *EventHandlers) handlePaymentFailed(msg messaging.Message) (messaging.MessageState, error) {
+    var evt payment.EventFailed
+    json.Unmarshal(msg.Data, &evt)
+
+    // Compensation: cancel the reservation
+    reason := fmt.Sprintf("payment_failed: %s - %s", evt.ErrorCode, evt.ErrorMsg)
+    h.bookingService.OnPaymentFailed(ctx, evt.ReservationID, reason)
+
+    return messaging.MessageStateCompleted, nil
+}
+```
+
+### Saga Steps with Compensation
+
+| Step | Action | Compensation on Failure |
+|------|--------|------------------------|
+| 1 | Create Reservation | N/A (first step) |
+| 2 | Authorize Payment | Cancel Reservation |
+| 3 | Capture Payment | Cancel Reservation |
+| 4 | Confirm Reservation | Refund Payment, Cancel Reservation |
+| 5 | Send Notification | Best effort (no compensation) |
+
+---
+
+## Database Design
+
+### Database-per-Context Pattern
+
+Each bounded context has its own PostgreSQL database:
+
+| Context | Database | Port | Container |
+|---------|----------|------|-----------|
+| Reservation | `reservation_db` | 5432 | `postgres-reservation` |
+| Payment | `payment_db` | 5433 | `postgres-payment` |
+
+### Reservation Schema
+
+```sql
+-- migrations/reservation/init.sql
+
+CREATE TABLE IF NOT EXISTS reservations (
+    id VARCHAR(255) PRIMARY KEY,
+    guest_id VARCHAR(255) NOT NULL,
+    room_id VARCHAR(255) NOT NULL,
+    check_in TIMESTAMP WITH TIME ZONE NOT NULL,
+    check_out TIMESTAMP WITH TIME ZONE NOT NULL,
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    total_amount_cents BIGINT NOT NULL,
+    total_amount_currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    cancellation_reason TEXT,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT valid_reservation_status CHECK (
+        status IN ('pending', 'confirmed', 'active', 'completed', 'cancelled')
+    ),
+    CONSTRAINT valid_date_range CHECK (check_out > check_in)
+);
+
+CREATE TABLE IF NOT EXISTS reservation_guests (
+    id SERIAL PRIMARY KEY,
+    reservation_id VARCHAR(255) NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    phone_number VARCHAR(50)
+);
+
+-- Indexes for query optimization
+CREATE INDEX IF NOT EXISTS idx_reservations_guest_id ON reservations(guest_id);
+CREATE INDEX IF NOT EXISTS idx_reservations_room_id ON reservations(room_id);
+CREATE INDEX IF NOT EXISTS idx_reservations_room_dates ON reservations(room_id, check_in, check_out);
+```
+
+### Payment Schema
+
+```sql
+-- migrations/payment/init.sql
+
+CREATE TABLE IF NOT EXISTS payments (
+    id VARCHAR(255) PRIMARY KEY,
+    reservation_id VARCHAR(255) NOT NULL,  -- NOT a foreign key (cross-database)
+    amount_cents BIGINT NOT NULL,
+    amount_currency VARCHAR(3) NOT NULL DEFAULT 'USD',
+    status VARCHAR(50) NOT NULL DEFAULT 'pending',
+    payment_method VARCHAR(100),
+    transaction_id VARCHAR(255),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+
+    CONSTRAINT valid_payment_status CHECK (
+        status IN ('pending', 'authorized', 'captured', 'failed', 'refunded')
+    )
+);
+
+CREATE TABLE IF NOT EXISTS payment_attempts (
+    id SERIAL PRIMARY KEY,
+    payment_id VARCHAR(255) NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
+    attempted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+    status VARCHAR(50) NOT NULL,
+    error_code VARCHAR(100),
+    error_msg TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_payments_reservation_id ON payments(reservation_id);
+CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
+```
+
+### Cross-Database References
+
+The `payment.reservation_id` column references reservations but is **not** a foreign key because:
+
+1. Reservations and payments are in different databases
+2. Referential integrity is maintained via domain events
+3. Each context can scale independently
+
+---
+
+## API Design
+
+### HTTP Routes
+
+| Method | Path | Handler | Auth | Description |
+|--------|------|---------|------|-------------|
+| GET | `/ui/` | `HttpViewIndex` | Yes | Dashboard |
+| GET | `/ui/login` | `HttpViewLogin` | No | OIDC login redirect |
+| GET | `/ui/error` | `HttpViewError` | No | Error page |
+| GET | `/ui/reservations` | `HttpViewReservations` | Yes | List reservations |
+| GET | `/ui/reservations/new` | `HttpViewReservationForm` | Yes | New reservation form |
+| POST | `/ui/reservations` | `HttpCreateReservation` | Yes | Create reservation |
+| GET | `/ui/reservations/{id}` | `HttpViewReservationDetail` | Yes | Reservation detail |
+| POST | `/ui/reservations/{id}/cancel` | `HttpCancelReservation` | Yes | Cancel reservation |
+| GET | `/manifest.json` | `HttpViewManifest` | No | PWA manifest |
+| GET | `/sw.js` | `HttpViewServiceWorker` | No | Service worker |
+| POST | `/mcp` | `mcpHandler.Handler()` | No | MCP JSON-RPC endpoint |
+| GET | `/liveness` | (built-in) | No | Health check |
+| GET | `/readiness` | (built-in) | No | Readiness check |
+
+### View Response Pattern
+
+Each view handler defines its own response struct:
+
+```go
+type HttpViewReservationsResponse struct {
+    AppName      string
+    Title        string
+    SessionID    string
+    Reservations []ReservationListItem
+}
+
+type ReservationListItem struct {
+    ID          string
+    RoomID      string
+    CheckIn     string
+    CheckOut    string
+    Status      string
+    StatusClass string  // CSS class for status badge
+    TotalAmount string
+    CanCancel   bool
+}
+```
+
+### HTMX Integration
+
+Cancel operations support HTMX for partial page updates:
+
+```go
+if r.Header.Get("HX-Request") == "true" {
+    w.Header().Set("HX-Redirect", "/ui/reservations")
+    w.WriteHeader(http.StatusOK)
+    return
+}
+http.Redirect(w, r, "/ui/reservations", http.StatusSeeOther)
+```
+
+---
+
+## Testing Strategy
+
+### Test File Organization
+
+```
+*_test.go files located alongside source files:
+
+internal/domain/reservation/
+├── aggregate.go
+├── aggregate_test.go      # Aggregate unit tests
+├── service.go
+└── service_test.go        # Service integration tests
+
+internal/adapters/inbound/
+├── router.go
+├── router_test.go         # Route registration tests
+├── http_booking_*.go
+└── http_booking_*_test.go # Handler tests
+```
+
+### Test Naming Convention
+
+```go
+// Pattern: Test_{Component}_{Scenario}_Should_{ExpectedResult}
+
+func Test_Reservation_Confirm_From_Pending_Should_Succeed(t *testing.T)
+func Test_Service_CreateReservation_When_Room_Unavailable_Should_Return_Error(t *testing.T)
+func Test_Route_Liveness_Endpoint_Should_Return_200(t *testing.T)
+```
+
+### Mock Implementations
+
+Tests use in-test mock implementations:
+
+```go
+// Arrange-Act-Assert pattern
+
+type mockReservationRepository struct {
+    reservations map[reservation.ReservationID]reservation.Reservation
+    createErr    error
+    readErr      error
+}
+
+func (m *mockReservationRepository) Create(ctx context.Context, id ReservationID, res Reservation) error {
+    if m.createErr != nil {
+        return m.createErr
+    }
+    m.reservations[id] = res
+    return nil
+}
+
+type mockEventPublisher struct {
+    published []event.Event
+    err       error
+}
+```
+
+### Test Categories
+
+| Category | Location | Purpose |
+|----------|----------|---------|
+| Aggregate Tests | `domain/*/aggregate_test.go` | Business rule validation |
+| Service Tests | `domain/*/service_test.go` | Workflow orchestration |
+| Handler Tests | `adapters/inbound/*_test.go` | HTTP request/response |
+| Adapter Tests | `adapters/outbound/*_test.go` | Infrastructure integration |
+| Integration Tests | Separate test suite | End-to-end flows |
+
+### Running Tests
+
+```bash
+just test                    # Run all unit tests with coverage
+just test-integration        # Run integration tests (requires Docker)
+go test -v -run TestName ./internal/domain/reservation/...  # Single test
+```
+
+---
+
+## Conventions and Patterns
+
+### Package Naming
+
+- Domain packages use singular nouns: `reservation`, `payment`, `orchestration`
+- Adapter packages use direction: `inbound`, `outbound`
+- Shared code uses descriptive names: `shared`
+
+### File Naming
+
+| Pattern | Content |
+|---------|---------|
+| `aggregate.go` | Aggregate root definition |
+| `entities.go` | Value objects and embedded entities |
+| `ports.go` | Interface definitions (ports) |
+| `events.go` | Domain event definitions |
+| `service.go` | Application service |
+| `*_test.go` | Test files |
+| `http_*.go` | HTTP handlers |
+
+### Error Handling
+
+1. **Wrap errors with context:**
+```go
+if err := s.reservationRepo.Create(ctx, id, *reservation); err != nil {
+    return nil, fmt.Errorf("failed to persist reservation: %w", err)
+}
+```
+
+2. **Use sentinel errors for domain rules:**
+```go
+if r.Status == StatusCancelled {
+    return ErrAlreadyCancelled
+}
+```
+
+3. **State transition errors include current state:**
+```go
+return fmt.Errorf("%w: cannot confirm from %s", ErrInvalidStateTransition, r.Status)
+```
+
+### Context Propagation
+
+All methods accept `context.Context` as the first parameter:
+
+```go
+func (s *Service) CreateReservation(ctx context.Context, ...) (*Reservation, error)
+func (r ReservationRepository) Create(ctx context.Context, id ReservationID, res Reservation) error
+```
+
+### Dependency Injection
+
+Dependencies are injected via constructors:
+
+```go
 func NewService(
     repo ReservationRepository,
     checker AvailabilityChecker,
@@ -497,640 +968,286 @@ func NewService(
         publisher:           pub,
     }
 }
-
-func (s *Service) CreateReservation(ctx context.Context, ...) (*Reservation, error) {
-    // 1. Check availability
-    // 2. Create aggregate
-    // 3. Persist
-    // 4. Publish event
-}
 ```
 
-**Location**: `internal/domain/payment/service.go`
+### Event Builder Pattern
+
+Events use method chaining for readable construction:
 
 ```go
-type Service struct {
-    paymentRepo    PaymentRepository
-    paymentGateway PaymentGateway
-    publisher      event.EventPublisher
-}
-
-func (s *Service) AuthorizePaymentForReservation(ctx context.Context, ...) (*Payment, error) {
-    // 1. Create payment aggregate
-    // 2. Call payment gateway
-    // 3. Update payment status
-    // 4. Persist
-    // 5. Publish event
-}
+evt := NewEventCreated().
+    WithReservationID(id).
+    WithGuestID(guestID).
+    WithRoomID(roomID).
+    WithCheckIn(dateRange.CheckIn).
+    WithCheckOut(dateRange.CheckOut).
+    WithTotalAmount(amount)
 ```
 
 ---
 
-### 2.10 Saga/Orchestration Pattern (Event-Driven)
+## Recipes
 
-**Pattern**: Event-driven saga coordination with compensation on failure.
+### Adding a New Domain Event
 
-**Location**: `internal/domain/orchestration/booking_service.go`
+1. Define the event struct in `domain/{context}/events.go`:
 
 ```go
-type BookingService struct {
-    reservationService  *reservation.Service
-    paymentService      *payment.Service
-    notificationService NotificationService
+type EventNewThing struct {
+    ReservationID ReservationID `json:"reservation_id"`
+    NewField      string        `json:"new_field"`
 }
 
-func (s *BookingService) OnPaymentAuthorized(ctx context.Context, paymentID payment.PaymentID, reservationID shared.ReservationID) error {
-    // Capture the payment
-    if err := s.paymentService.CapturePayment(ctx, paymentID); err != nil {
-        return fmt.Errorf("failed to capture payment: %w", err)
-    }
-    return nil
+func NewEventNewThing() *EventNewThing {
+    return &EventNewThing{}
 }
 
-func (s *BookingService) OnPaymentCaptured(ctx context.Context, reservationID shared.ReservationID) error {
-    // Confirm the reservation
-    if err := s.reservationService.ConfirmReservation(ctx, reservationID); err != nil {
-        return fmt.Errorf("failed to confirm reservation: %w", err)
-    }
-    return nil
-}
+func (e *EventNewThing) Topic() string { return "reservation.new_thing" }
 
-func (s *BookingService) OnPaymentFailed(ctx context.Context, reservationID shared.ReservationID, reason string) error {
-    // Compensation: Cancel the reservation
-    if err := s.reservationService.CancelReservation(ctx, reservationID, reason); err != nil {
-        return fmt.Errorf("failed to cancel reservation: %w", err)
-    }
-    return nil
+func (e *EventNewThing) WithReservationID(id ReservationID) *EventNewThing {
+    e.ReservationID = id
+    return e
 }
 ```
 
-**Location**: `internal/domain/orchestration/event_handlers.go`
+2. Publish from the service:
 
 ```go
-type EventHandlers struct {
-    bookingService     *BookingService
-    reservationService *reservation.Service
-    paymentService     *payment.Service
-}
-
-func (h *EventHandlers) RegisterHandlers(ctx context.Context, dispatcher messaging.Dispatcher) error {
-    // Payment context subscribes to reservation.created
-    if err := dispatcher.Subscribe(ctx, reservation.EventTopicCreated, service.Wrap(h.handleReservationCreated)); err != nil {
-        return err
-    }
-
-    // Orchestration subscribes to payment.authorized
-    if err := dispatcher.Subscribe(ctx, payment.EventTopicAuthorized, service.Wrap(h.handlePaymentAuthorized)); err != nil {
-        return err
-    }
-
-    // Reservation context subscribes to payment.captured
-    if err := dispatcher.Subscribe(ctx, payment.EventTopicCaptured, service.Wrap(h.handlePaymentCaptured)); err != nil {
-        return err
-    }
-
-    // Orchestration subscribes to payment.failed for compensation
-    if err := dispatcher.Subscribe(ctx, payment.EventTopicFailed, service.Wrap(h.handlePaymentFailed)); err != nil {
-        return err
-    }
-
-    return nil
-}
-
-func (h *EventHandlers) handleReservationCreated(msg messaging.Message) (messaging.MessageState, error) {
-    var evt reservation.EventCreated
-    if err := json.Unmarshal(msg.Data, &evt); err != nil {
-        return messaging.MessageStateFailed, err
-    }
-
-    // Trigger payment authorization
-    _, err := h.paymentService.AuthorizePaymentForReservation(ctx, ...)
-    if err != nil {
-        return messaging.MessageStateFailed, err
-    }
-
-    return messaging.MessageStateCompleted, nil
-}
+evt := NewEventNewThing().WithReservationID(id).WithNewField("value")
+s.publisher.Publish(ctx, evt)
 ```
 
----
-
-## 3. Adapter Layer Patterns
-
-### 3.1 PostgreSQL Repository Implementation
-
-**Pattern**: SQL repository implementing domain port, using pgx driver.
-
-**Location**: `internal/adapters/outbound/postgres_reservation_repository.go`
+3. Subscribe in orchestration if cross-context:
 
 ```go
-type PostgresReservationRepository struct {
-    db *sql.DB
-}
-
-func NewPostgresReservationRepository(db *sql.DB) *PostgresReservationRepository {
-    return &PostgresReservationRepository{db: db}
-}
-
-func (r *PostgresReservationRepository) Create(ctx context.Context, id reservation.ReservationID, res reservation.Reservation) error {
-    tx, err := r.db.BeginTx(ctx, nil)
-    if err != nil {
-        return fmt.Errorf("failed to begin transaction: %w", err)
-    }
-    defer tx.Rollback()
-
-    // Insert reservation
-    _, err = tx.ExecContext(ctx, `
-        INSERT INTO reservations (id, guest_id, room_id, check_in, check_out, status, total_amount, currency, created_at, updated_at)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-    `, id, res.GuestID, res.RoomID, res.DateRange.CheckIn, res.DateRange.CheckOut, res.Status, res.TotalAmount.Amount, res.TotalAmount.Currency, res.CreatedAt, res.UpdatedAt)
-    if err != nil {
-        return fmt.Errorf("failed to insert reservation: %w", err)
-    }
-
-    // Insert guests
-    for _, guest := range res.Guests {
-        _, err = tx.ExecContext(ctx, `
-            INSERT INTO reservation_guests (reservation_id, name, email, phone_number)
-            VALUES ($1, $2, $3, $4)
-        `, id, guest.Name, guest.Email, guest.PhoneNumber)
-        if err != nil {
-            return fmt.Errorf("failed to insert guest: %w", err)
-        }
-    }
-
-    return tx.Commit()
-}
-
-func (r *PostgresReservationRepository) Read(ctx context.Context, id reservation.ReservationID) (*reservation.Reservation, error) {
-    // Query reservation
-    // Query guests
-    // Assemble aggregate
-    return &res, nil
-}
+dispatcher.Subscribe(ctx, "reservation.new_thing", service.Wrap(h.handleNewThing))
 ```
 
-**Location**: `internal/adapters/outbound/postgres_connection.go`
+### Adding a New HTTP Endpoint
+
+1. Create handler in `adapters/inbound/http_{feature}.go`:
 
 ```go
-func NewPostgresConnection() (*sql.DB, error) {
-    dsn := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
-        os.Getenv("POSTGRES_HOST"),
-        os.Getenv("POSTGRES_PORT"),
-        os.Getenv("POSTGRES_USER"),
-        os.Getenv("POSTGRES_PASSWORD"),
-        os.Getenv("POSTGRES_DB"),
-        os.Getenv("POSTGRES_SSLMODE"),
-    )
-
-    db, err := sql.Open("pgx", dsn)
-    if err != nil {
-        return nil, fmt.Errorf("failed to open database: %w", err)
-    }
-
-    // Configure connection pool
-    db.SetMaxOpenConns(25)
-    db.SetMaxIdleConns(5)
-    db.SetConnMaxLifetime(5 * time.Minute)
-
-    if err := db.Ping(); err != nil {
-        return nil, fmt.Errorf("failed to ping database: %w", err)
-    }
-
-    return db, nil
-}
-```
-
----
-
-### 3.2 Database Schema
-
-**Location**: `migrations/init.sql`
-
-```sql
-CREATE TABLE reservations (
-    id VARCHAR(255) PRIMARY KEY,
-    guest_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    check_in TIMESTAMP NOT NULL,
-    check_out TIMESTAMP NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    total_amount BIGINT NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    cancellation_reason TEXT,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL
-);
-
-CREATE TABLE reservation_guests (
-    id SERIAL PRIMARY KEY,
-    reservation_id VARCHAR(255) NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(50)
-);
-
-CREATE TABLE payments (
-    id VARCHAR(255) PRIMARY KEY,
-    reservation_id VARCHAR(255) NOT NULL,
-    amount BIGINT NOT NULL,
-    currency VARCHAR(10) NOT NULL,
-    payment_method VARCHAR(50) NOT NULL,
-    status VARCHAR(50) NOT NULL,
-    transaction_id VARCHAR(255),
-    error_code VARCHAR(50),
-    error_message TEXT,
-    created_at TIMESTAMP NOT NULL,
-    updated_at TIMESTAMP NOT NULL
-);
-
-CREATE TABLE payment_attempts (
-    id SERIAL PRIMARY KEY,
-    payment_id VARCHAR(255) NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
-    status VARCHAR(50) NOT NULL,
-    error_code VARCHAR(50),
-    error_message TEXT,
-    attempted_at TIMESTAMP NOT NULL
-);
-
-CREATE INDEX idx_reservations_guest_id ON reservations(guest_id);
-CREATE INDEX idx_reservations_room_id ON reservations(room_id);
-CREATE INDEX idx_reservations_status ON reservations(status);
-CREATE INDEX idx_reservations_check_in ON reservations(check_in);
-CREATE INDEX idx_payments_reservation_id ON payments(reservation_id);
-```
-
----
-
-### 3.3 HTTP Handler Factory Pattern
-
-**Pattern**: Factory function returns `http.HandlerFunc` closure with captured dependencies.
-
-**Location**: `internal/adapters/inbound/http_booking_reservations.go`
-
-```go
-func HttpViewReservations(e *templating.Engine, reservationService *reservation.Service) http.HandlerFunc {
-    appName := os.Getenv("APP_NAME")
-    title := appName + " - Reservations"
-
+func HttpViewNewFeature(e *templating.Engine, service *reservation.Service) http.HandlerFunc {
     return func(w http.ResponseWriter, r *http.Request) {
-        ctx := r.Context()
-
-        sessionID, _ := ctx.Value(web.ContextSessionID).(string)
-        email, _ := ctx.Value(web.ContextEmail).(string)
-        if sessionID == "" || email == "" {
-            redirecting.Redirect(w, r, "/ui/login")
-            return
-        }
-
-        guestID := reservation.GuestID(email)
-        reservations, err := reservationService.ListReservationsByGuest(ctx, guestID)
-        // ... map to view model and render
+        // Implementation
     }
 }
 ```
 
----
-
-### 3.4 Error Page Handler Pattern
-
-**Pattern**: Dedicated error page handler that accepts error details via query parameters.
-
-**Location**: `internal/adapters/inbound/http_error.go`
+2. Register route in `router.go`:
 
 ```go
-type HttpViewErrorResponse struct {
-    AppName      string
-    Title        string
-    ErrorTitle   string
-    ErrorMessage string
-    ErrorDetails string
-}
-
-func HttpViewError(e *templating.Engine) http.HandlerFunc {
-    appName := os.Getenv("APP_NAME")
-    pageTitle := appName + " - Error"
-
-    return func(w http.ResponseWriter, r *http.Request) {
-        errorTitle := r.URL.Query().Get("title")
-        errorMessage := r.URL.Query().Get("message")
-        errorDetails := r.URL.Query().Get("details")
-
-        // Set defaults if not provided
-        if errorTitle == "" {
-            errorTitle = "An Error Occurred"
-        }
-        if errorMessage == "" {
-            errorMessage = "Something went wrong. Please try again."
-        }
-
-        data := HttpViewErrorResponse{
-            AppName:      appName,
-            Title:        pageTitle,
-            ErrorTitle:   errorTitle,
-            ErrorMessage: errorMessage,
-            ErrorDetails: errorDetails,
-        }
-
-        HttpView(e, "error", data)(w, r)
-    }
-}
+mux.HandleFunc("GET /ui/new-feature", logging.WithLogging(logger, web.WithAuth(serverSessions, HttpViewNewFeature(e, reservationService))))
 ```
 
-**Usage**: Redirect to error page with URL-encoded parameters:
+### Adding a New Bounded Context
+
+1. Create domain package structure:
+
 ```
-/ui/error?title=Authentication%20Failed&message=Invalid%20credentials&details=oauth2%3A%20unauthorized_client
+internal/domain/newcontext/
+├── aggregate.go
+├── entities.go
+├── ports.go
+├── events.go
+└── service.go
 ```
 
-**Template Location**: `cmd/server/assets/templates/error.tmpl`
+2. Create database migration:
 
----
+```
+migrations/newcontext/init.sql
+```
 
-### 3.5 Router Middleware Composition
+3. Add to `docker-compose.yml`:
 
-**Pattern**: Functional middleware chain, explicit composition per route.
+```yaml
+postgres-newcontext:
+  image: postgres:16-alpine
+  environment:
+    POSTGRES_DB: newcontext_db
+  volumes:
+    - ./migrations/newcontext/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+```
 
-**Location**: `internal/adapters/inbound/router.go`
+4. Wire in `main.go`:
 
 ```go
-func Route(ctx context.Context, efs fs.FS, logger *slog.Logger,
-           reservationService *reservation.Service) *http.ServeMux {
-
-    mux, serverSessions := web.NewServeMux(ctx, efs)
-    e := templating.NewEngine(efs)
-    e.Parse("assets/templates/*.tmpl")
-
-    // Public endpoints
-    mux.HandleFunc("GET /ui/login",
-        logging.WithLogging(logger, HttpViewLogin(e)))
-
-    // Protected endpoints
-    mux.HandleFunc("GET /ui/reservations",
-        logging.WithLogging(logger,
-            web.WithAuth(serverSessions,
-                HttpViewReservations(e, reservationService))))
-
-    return mux
-}
+newcontextDB, _ := sql.Open("pgx", newcontextDSN)
+newcontextRepo := resource.NewPostgresAccess[newcontext.ID, newcontext.Aggregate](newcontextDB)
+newcontextService := newcontext.NewService(newcontextRepo, publisher)
 ```
 
----
+### Implementing a New Outbound Adapter
 
-### 3.6 Mock Adapter Pattern
-
-**Pattern**: Configurable mock for production/testing with error injection and state tracking.
-
-**Location**: `internal/adapters/outbound/mock_payment_gateway.go`
+1. Identify the port interface in domain:
 
 ```go
-type MockPaymentGateway struct {
-    transactions map[string]shared.Money
-    FailureRate  float64
-    ShouldFail   bool
-}
-
-func NewMockPaymentGateway() *MockPaymentGateway {
-    return &MockPaymentGateway{
-        transactions: make(map[string]shared.Money),
-    }
-}
-
-func (g *MockPaymentGateway) Authorize(ctx context.Context, pay *payment.Payment) (string, error) {
-    if g.ShouldFail {
-        return "", errors.New("payment authorization failed")
-    }
-
-    transactionID := fmt.Sprintf("txn_%s_%d", pay.ID, pay.Amount.Amount)
-    g.transactions[transactionID] = pay.Amount
-    return transactionID, nil
+// domain/payment/ports.go
+type PaymentGateway interface {
+    Authorize(ctx context.Context, payment *Payment) (transactionID string, err error)
+    Capture(ctx context.Context, transactionID string, amount Money) error
+    Refund(ctx context.Context, transactionID string, amount Money) error
 }
 ```
 
----
-
-## 4. Testing Patterns
-
-### 4.1 Test Naming Convention
-
-**Pattern**: `Test_{Component}_{Scenario}_Should_{ExpectedResult}`
+2. Implement in `adapters/outbound/`:
 
 ```go
-// Domain unit tests
-func Test_Reservation_Confirm_From_Pending_Should_Change_Status(t *testing.T)
+// adapters/outbound/stripe_payment_gateway.go
+type StripePaymentGateway struct {
+    client *stripe.Client
+}
 
-// Service tests
-func Test_ReservationService_CreateReservation_Should_Succeed(t *testing.T)
+func NewStripePaymentGateway(apiKey string) *StripePaymentGateway {
+    return &StripePaymentGateway{
+        client: stripe.NewClient(apiKey),
+    }
+}
 
-// HTTP handler tests
-func Test_Route_Liveness_Endpoint_Should_Return_200(t *testing.T)
-
-// Adapter tests
-func Test_MockPaymentGateway_Authorize_With_ShouldFail_Should_Return_Error(t *testing.T)
+func (g *StripePaymentGateway) Authorize(ctx context.Context, pay *payment.Payment) (string, error) {
+    // Stripe API call
+}
 ```
 
----
-
-### 4.2 Mock Repository Pattern (In-Test)
-
-**Pattern**: Simple in-memory mock implementing repository interface.
+3. Inject in `main.go`:
 
 ```go
-type mockReservationRepository struct {
-    reservations map[reservation.ReservationID]reservation.Reservation
-    readAllErr   error
-}
-
-func newMockReservationRepository() *mockReservationRepository {
-    return &mockReservationRepository{
-        reservations: make(map[reservation.ReservationID]reservation.Reservation),
-    }
-}
-
-func (m *mockReservationRepository) Create(ctx context.Context, id reservation.ReservationID, res reservation.Reservation) error {
-    m.reservations[id] = res
-    return nil
-}
-
-func (m *mockReservationRepository) Read(ctx context.Context, id reservation.ReservationID) (*reservation.Reservation, error) {
-    res, ok := m.reservations[id]
-    if !ok {
-        return nil, errors.New("not found")
-    }
-    return &res, nil
-}
+paymentGateway := outbound.NewStripePaymentGateway(os.Getenv("STRIPE_API_KEY"))
+paymentService := payment.NewService(paymentRepo, paymentGateway, paymentPublisher)
 ```
 
 ---
 
-## 5. Configuration
+## Infrastructure
+
+### Docker Compose Services
+
+```yaml
+services:
+  app:
+    image: "${USER}/${APP_SHORTNAME}:latest"
+    depends_on: [keycloak, kafka, postgres-reservation, postgres-payment]
+    ports: ["8080:8080"]
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    ports: ["8180:8080"]
+    # OIDC provider
+
+  kafka:
+    image: apache/kafka:latest
+    ports: ["9092:9092"]
+    # Event streaming
+
+  postgres-reservation:
+    image: postgres:16-alpine
+    ports: ["5432:5432"]
+    # Reservation database
+
+  postgres-payment:
+    image: postgres:16-alpine
+    ports: ["5433:5432"]
+    # Payment database
+```
 
 ### Environment Variables
 
-| Variable | Purpose | Default/Example |
-|----------|---------|-----------------|
-| `PORT` | HTTP server port | `8080` |
-| `APP_NAME` | Display name for UI | `Hotel Booking` |
-| `APP_DESCRIPTION` | Application description | `Hotel reservation and payment management system` |
-| `APP_SHORTNAME` | Short name for Docker/containers | `hotel-booking` |
-| `POSTGRES_HOST` | PostgreSQL host | `localhost` |
-| `POSTGRES_PORT` | PostgreSQL port | `5432` |
-| `POSTGRES_USER` | PostgreSQL user | `booking` |
-| `POSTGRES_PASSWORD` | PostgreSQL password | `booking_secret` |
-| `POSTGRES_DB` | PostgreSQL database | `booking_db` |
-| `POSTGRES_SSLMODE` | SSL mode | `disable` |
-| `KAFKA_BROKERS` | Kafka broker addresses | `localhost:9092` |
-| `OIDC_CLIENT_ID` | Keycloak client ID | `hotel-booking` |
-| `OIDC_ISSUER` | Keycloak issuer URL | `http://localhost:8180/realms/local` |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `PORT` | `8080` | HTTP server port |
+| `APP_NAME` | - | Application display name |
+| `APP_SHORTNAME` | - | Short name for Docker image |
+| `RESERVATION_DB_HOST` | `localhost` | Reservation DB host |
+| `RESERVATION_DB_PORT` | `5432` | Reservation DB port |
+| `RESERVATION_DB_USER` | `reservation` | Reservation DB user |
+| `RESERVATION_DB_PASSWORD` | `reservation_secret` | Reservation DB password |
+| `RESERVATION_DB_NAME` | `reservation_db` | Reservation DB name |
+| `PAYMENT_DB_HOST` | `localhost` | Payment DB host |
+| `PAYMENT_DB_PORT` | `5433` | Payment DB port |
+| `PAYMENT_DB_USER` | `payment` | Payment DB user |
+| `PAYMENT_DB_PASSWORD` | `payment_secret` | Payment DB password |
+| `PAYMENT_DB_NAME` | `payment_db` | Payment DB name |
 
----
+### Embedded Filesystem
 
-## 6. DI Wiring (main.go)
-
-**Location**: `cmd/server/main.go`
+Static assets are embedded at compile time:
 
 ```go
-func main() {
-    ctx, cancel := service.Context()
-    defer cancel()
-
-    logger := logging.NewJsonLogger()
-
-    // PostgreSQL connection
-    db, err := outbound.NewPostgresConnection()
-    if err != nil {
-        logger.Error("failed to connect to database", "error", err)
-        return
-    }
-    defer db.Close()
-
-    // Event dispatcher (Kafka)
-    dispatcher := messaging.NewKafkaDispatcher(os.Getenv("KAFKA_BROKERS"))
-
-    // Reservation context
-    reservationRepo := outbound.NewPostgresReservationRepository(db)
-    availabilityChecker := outbound.NewRepositoryAvailabilityChecker(reservationRepo)
-    reservationPublisher := outbound.NewEventPublisher(dispatcher)
-    reservationService := reservation.NewService(reservationRepo, availabilityChecker, reservationPublisher)
-
-    // Payment context
-    paymentRepo := outbound.NewPostgresPaymentRepository(db)
-    paymentGateway := outbound.NewMockPaymentGateway()
-    paymentPublisher := outbound.NewEventPublisher(dispatcher)
-    paymentService := payment.NewService(paymentRepo, paymentGateway, paymentPublisher)
-
-    // Orchestration layer
-    notificationService := outbound.NewMockNotificationService(logger)
-    bookingService := orchestration.NewBookingService(reservationService, paymentService, notificationService)
-
-    // Register event handlers
-    eventHandlers := orchestration.NewEventHandlers(bookingService, reservationService, paymentService)
-    if err := eventHandlers.RegisterHandlers(ctx, dispatcher); err != nil {
-        logger.Error("failed to register event handlers", "error", err)
-        return
-    }
-
-    // HTTP routing
-    mux := inbound.Route(ctx, efs, logger, reservationService)
-
-    // MCP endpoint for AI tool integration
-    mcpServer := buildMCPServer()
-    mcpHandler := web.NewMCPHandler(mcpServer)
-    mux.Handle("POST /mcp", logging.WithLogging(logger, mcpHandler.Handler()))
-
-    // Start server
-    srv := web.NewServer(mux)
-    defer srv.Close()
-
-    logger.Info("server initialized", "port", os.Getenv("PORT"))
-    if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-        logger.Error("server failed", "error", err)
-    }
-}
+//go:embed assets
+var efs embed.FS
 ```
 
 ---
 
-## 7. MCP Integration
+## Security
 
-### Model Context Protocol (MCP) Endpoint
+### Authentication
 
-The application exposes an MCP endpoint for AI tool integration at `POST /mcp`.
+- **Keycloak** provides OIDC/OAuth2 authentication
+- Sessions managed via `cloud-native-utils/web` package
+- Protected routes use `web.WithAuth` middleware
 
-**Location**: `cmd/server/main.go`
+### Authorization
+
+- Guests can only view/modify their own reservations:
 
 ```go
-// buildMCPServer creates the MCP server with all tools registered.
-func buildMCPServer() *mcp.Server {
-    server := mcp.NewServer(
-        security.ParseStringOrDefault("APP_SHORTNAME", "mcp-server"),
-        security.ParseStringOrDefault("APP_VERSION", "1.0.0"),
-    )
-    // TODO: register MCP tools here
-    // server.RegisterTool(tool)
-    return server
+if string(res.GuestID) != email {
+    http.Error(w, "Access denied", http.StatusForbidden)
+    return
 }
 ```
 
-**Wiring in main()**:
-```go
-// MCP endpoint for AI tool integration
-mcpServer := buildMCPServer()
-mcpHandler := web.NewMCPHandler(mcpServer)
-mux.Handle("POST /mcp", logging.WithLogging(logger, mcpHandler.Handler()))
-```
+### Cross-Context Security
 
-### Testing the MCP Endpoint
+- Databases are isolated with separate credentials
+- Event messaging uses internal network only
+- No direct database access between contexts
+
+---
+
+## Deployment
+
+### Development
 
 ```bash
-curl -X POST http://localhost:8080/mcp \
-  -H "Content-Type: application/json" \
-  -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
+just up       # Start all services
+just down     # Stop all services
+just logs     # View application logs
 ```
 
-### Adding MCP Tools
+### Production Dockerfile
 
-Tools are registered in `buildMCPServer()` using the cloud-native-utils MCP package:
+```dockerfile
+# Multi-stage build
+FROM golang:1.25-alpine AS builder
+WORKDIR /app
+COPY . .
+RUN go build -o server ./cmd/server
 
-```go
-func buildMCPServer() *mcp.Server {
-    server := mcp.NewServer("hotel-booking-mcp", "1.0.0")
-
-    // Example: List reservations tool
-    schema := mcp.NewObjectSchema(
-        map[string]mcp.Property{
-            "guest_id": mcp.NewStringProperty("Guest ID (email)"),
-        },
-        []string{"guest_id"},
-    )
-
-    handler := func(ctx context.Context, params mcp.ToolsCallParams) (mcp.ToolsCallResult, error) {
-        guestID, _ := params.Arguments["guest_id"].(string)
-        // Call reservation service...
-        return mcp.ToolsCallResult{
-            Content: []mcp.ContentBlock{mcp.NewTextContent("result")},
-        }, nil
-    }
-
-    server.RegisterTool(mcp.NewTool("list_reservations", "List guest reservations", schema, handler))
-    return server
-}
+FROM alpine:latest
+COPY --from=builder /app/server /server
+ENTRYPOINT ["/server"]
 ```
+
+### Health Checks
+
+- `/liveness` - Application is running
+- `/readiness` - Application can serve requests
 
 ---
 
-## 8. Dependencies
+## Glossary
 
-### External Libraries
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `github.com/andygeiss/cloud-native-utils` | v0.5.1 | Logging, messaging, web (security/http), templating, MCP |
-| `github.com/jackc/pgx/v5` | v5.x | PostgreSQL driver |
-
-### Infrastructure
-
-| Service | Purpose | Port |
-|---------|---------|------|
-| PostgreSQL | Primary database | 5432 |
-| Kafka | Event messaging | 9092 |
-| Keycloak | OIDC authentication | 8180 |
+| Term | Definition |
+|------|------------|
+| **Aggregate** | Cluster of domain objects treated as a single unit |
+| **Bounded Context** | Logical boundary within which a domain model is defined |
+| **Domain Event** | Record of something significant that happened in the domain |
+| **Port** | Interface defining how the domain interacts with the outside world |
+| **Adapter** | Implementation of a port that connects to external systems |
+| **Saga** | Pattern for managing distributed transactions via compensation |
+| **Shared Kernel** | Common code shared between bounded contexts |
+| **Value Object** | Immutable object defined by its attributes, not identity |
