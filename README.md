@@ -46,7 +46,7 @@ This repository provides a reference implementation for structuring Go applicati
 - Implement **Event-Driven Communication** between contexts via Kafka
 - Use the **Saga Pattern** for cross-context workflow orchestration
 - Integrate authentication via **OIDC/Keycloak**
-- Persist data with **PostgreSQL** (separate databases per bounded context)
+- Persist data with **PostgreSQL** using key/value storage (separate databases per bounded context)
 
 ---
 
@@ -58,7 +58,7 @@ This repository provides a reference implementation for structuring Go applicati
 - **Event-Driven Communication** — Kafka-based pub/sub for inter-context messaging
 - **Hexagonal Architecture** — Clear separation between domain logic and infrastructure
 - **OIDC Authentication** — Keycloak integration with session management
-- **PostgreSQL Persistence** — Separate databases per bounded context (reservation_db, payment_db)
+- **PostgreSQL Persistence** — Key/value storage with separate databases per bounded context
 - **Production-Ready Docker** — Multi-stage build with PGO optimization
 - **Progressive Web App** — Service worker, manifest, and offline support
 - **Saga Pattern** — Event-driven booking workflow with compensation on failure
@@ -243,9 +243,9 @@ hotel-booking/
 ├── Dockerfile                    # Multi-stage production build
 ├── migrations/
 │   ├── reservation/
-│   │   └── init.sql              # Reservation database schema
+│   │   └── init.sql              # Reservation database schema (key/value)
 │   └── payment/
-│       └── init.sql              # Payment database schema
+│       └── init.sql              # Payment database schema (key/value)
 ├── internal/
 │   ├── adapters/
 │   │   ├── inbound/              # HTTP handlers, event subscribers
@@ -506,7 +506,7 @@ See `.env.example` for the complete list with documentation.
 - Bounded contexts (replace `reservation/`, `payment/`, `orchestration/` with your domains)
 - Shared kernel types in `internal/domain/shared/`
 - Static assets and templates in `cmd/server/assets/`
-- PostgreSQL schemas in `migrations/reservation/` and `migrations/payment/`
+- PostgreSQL schemas in `migrations/` (uses simple key/value pattern)
 - Environment configuration in `.env`
 - Docker Compose services as needed
 - Swap mock adapters for real implementations

@@ -684,81 +684,33 @@ Each bounded context has its own PostgreSQL database:
 | Reservation | `reservation_db` | 5432 | `postgres-reservation` |
 | Payment | `payment_db` | 5433 | `postgres-payment` |
 
-### Reservation Schema
+### Key/Value Storage Pattern
+
+Both contexts use a simple key/value storage pattern via `PostgresAccess` from `cloud-native-utils`. Aggregates are serialized as JSON and stored in a generic `kv_store` table:
 
 ```sql
--- migrations/reservation/init.sql
+-- migrations/reservation/init.sql and migrations/payment/init.sql
 
-CREATE TABLE IF NOT EXISTS reservations (
-    id VARCHAR(255) PRIMARY KEY,
-    guest_id VARCHAR(255) NOT NULL,
-    room_id VARCHAR(255) NOT NULL,
-    check_in TIMESTAMP WITH TIME ZONE NOT NULL,
-    check_out TIMESTAMP WITH TIME ZONE NOT NULL,
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    total_amount_cents BIGINT NOT NULL,
-    total_amount_currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-    cancellation_reason TEXT,
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-
-    CONSTRAINT valid_reservation_status CHECK (
-        status IN ('pending', 'confirmed', 'active', 'completed', 'cancelled')
-    ),
-    CONSTRAINT valid_date_range CHECK (check_out > check_in)
+CREATE TABLE IF NOT EXISTS kv_store (
+    key TEXT PRIMARY KEY,
+    value TEXT
 );
 
-CREATE TABLE IF NOT EXISTS reservation_guests (
-    id SERIAL PRIMARY KEY,
-    reservation_id VARCHAR(255) NOT NULL REFERENCES reservations(id) ON DELETE CASCADE,
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) NOT NULL,
-    phone_number VARCHAR(50)
-);
-
--- Indexes for query optimization
-CREATE INDEX IF NOT EXISTS idx_reservations_guest_id ON reservations(guest_id);
-CREATE INDEX IF NOT EXISTS idx_reservations_room_id ON reservations(room_id);
-CREATE INDEX IF NOT EXISTS idx_reservations_room_dates ON reservations(room_id, check_in, check_out);
+CREATE INDEX IF NOT EXISTS idx_kv_store_key ON kv_store (key);
 ```
 
-### Payment Schema
+**How it works:**
+- **Key:** The aggregate ID (e.g., `ReservationID` or `PaymentID`)
+- **Value:** The entire aggregate serialized as JSON
 
-```sql
--- migrations/payment/init.sql
+This approach:
+1. Simplifies schema management (no migrations needed for domain changes)
+2. Aligns with DDD aggregate boundaries (one row = one aggregate)
+3. Enables schema-less evolution of domain models
 
-CREATE TABLE IF NOT EXISTS payments (
-    id VARCHAR(255) PRIMARY KEY,
-    reservation_id VARCHAR(255) NOT NULL,  -- NOT a foreign key (cross-database)
-    amount_cents BIGINT NOT NULL,
-    amount_currency VARCHAR(3) NOT NULL DEFAULT 'USD',
-    status VARCHAR(50) NOT NULL DEFAULT 'pending',
-    payment_method VARCHAR(100),
-    transaction_id VARCHAR(255),
-    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+### Cross-Context References
 
-    CONSTRAINT valid_payment_status CHECK (
-        status IN ('pending', 'authorized', 'captured', 'failed', 'refunded')
-    )
-);
-
-CREATE TABLE IF NOT EXISTS payment_attempts (
-    id SERIAL PRIMARY KEY,
-    payment_id VARCHAR(255) NOT NULL REFERENCES payments(id) ON DELETE CASCADE,
-    attempted_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    status VARCHAR(50) NOT NULL,
-    error_code VARCHAR(100),
-    error_msg TEXT
-);
-
-CREATE INDEX IF NOT EXISTS idx_payments_reservation_id ON payments(reservation_id);
-CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
-```
-
-### Cross-Database References
-
-The `payment.reservation_id` column references reservations but is **not** a foreign key because:
+The `Payment` aggregate contains a `ReservationID` field but this is **not** a database foreign key because:
 
 1. Reservations and payments are in different databases
 2. Referential integrity is maintained via domain events
@@ -1054,10 +1006,16 @@ internal/domain/newcontext/
 └── service.go
 ```
 
-2. Create database migration:
+2. Create database migration with key/value schema:
 
-```
-migrations/newcontext/init.sql
+```sql
+-- migrations/newcontext/init.sql
+CREATE TABLE IF NOT EXISTS kv_store (
+    key TEXT PRIMARY KEY,
+    value TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_kv_store_key ON kv_store (key);
 ```
 
 3. Add to `docker-compose.yml`:

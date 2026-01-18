@@ -82,15 +82,8 @@ func main() {
 	dispatcher := messaging.NewExternalDispatcher()
 
 	// Initialize reservation bounded context using PostgresAccess from cloud-native-utils.
+	// Schema is created by Docker init scripts (migrations/reservation/init.sql).
 	reservationRepo := resource.NewPostgresAccess[reservation.ReservationID, reservation.Reservation](reservationDB)
-
-	// Initialize reservation repository by deleting and recreating tables.
-	// This is a temporary solution for development purposes.
-	// In production, we would use a proper migration strategy instead of dropping tables.
-	if err := reservationRepo.Init(ctx); err != nil {
-		logger.Error("failed to initialize reservation repository", "error", err)
-		os.Exit(1)
-	}
 	availabilityChecker := outbound.NewRepositoryAvailabilityChecker(reservationRepo)
 	reservationPublisher := outbound.NewEventPublisher(dispatcher)
 	reservationService := reservation.NewService(reservationRepo, availabilityChecker, reservationPublisher)
